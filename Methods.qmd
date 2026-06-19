@@ -3,32 +3,32 @@ title: "Methods"
 author: "Cheyenne Leila Goodman"
 ---
 
-## Background data
-
-I am reviewing the Territorial Coral Reef Monitoring Program (TCRMP) dataset from 2013-2021 to investigate damselfish biomass and abundance. See statistical analysis to view the damselfish population trends between 2012-2021.
-
-I hope to get a hold of DPNR's dataset of damselfish predation to fill in gaps that TCRMP has. For example, not every diver knows/ records damselfish species during their coral health surveys to make an accurate depiction of damselfish-coral interaction.
 
 ## Water Table Methods
 
-Two 40gal water tables contain 48 *Porites astreoides* coral nubbins for ten days. 36 coral nubbins will be deployed in randomly across the 18 plots with one bleached and one unbleached coral in each plot.
-
-Twelve *Porites astreoides* (PAST) from Brewers Bay at relative depth (15-20ft) will be fragmented into \~5cm coral nubbins (n=48). Coral nubbins will be equally divided between ambient water temperature \~28 C and heated water temperature (\~32C).
-
-Due to the recent renovations in the Marine Science Center parking lot in July 2025, I created an altered water table design which required \>3 daily water changes. Three methods of shading was applied and neither water tables recieved flow. A hobologger was placed in each water table to record temperature every hour. See statistical analysis to view the results of this water table design.
+Eight *Porites astreoides* (PAST) from Brewers Bay at relative depths (4.57-6.09m) were be fragmented into 10-5cm\^2 coral nubbins (n=32). Coral nubbins were be equally divided between ambient water temperature \~28 C and heated water temperature (\~32C). The heated water table rose to 32C for ten days. Ambient and bleached fragments were placed into the randomly field.
 
 ## Field Methods
 
 ![Figure No. 1. A photo of a volunteer diver, Emma Dlutkowski, taken by Cheyenne L. Goodman](PHOTOS/DIVER.JPG)
 
-My site location is Brewers Bay, east of the Territorial Coral Reef Monitoring Program (TCRMP) site.. I have 18 *Orbicella annularis* plots: 6 damselfish-free control plots, 6 damselfish infested *Orbicella annularis* plots, and 6 *Orbicella annularis* plots where damselfish is removed.
+My site location is Brewers Bay, east of the Brewers Bay Territorial Coral Reef Monitoring Program (TCRMP) site. I had 18 *Orbicella annularis* dominated plots: 6 damselfish-free control plots, 6 damselfish infested *Orbicella annularis* plots, and 6 damselfish infested *Orbicella annularis* plots where damselfish was removed.
 
-Weekly, two to three divers will dive (\<25ft) at Brewers Bay (Figure No. 2) to complete a short coral health survey, fish survey and collect fish. One diver will be collecting data by scanning each 1m\^2 plot with an underwater camera. Once PASTs nubbins are deployed, the experiment will end at 10 weeks.
+Biweekly, two to three divers will dive (\<25ft) at Brewers Bay (Figure No. 1) to collect damselfishfish. Once a month I  collected data by scanning each 1m\^2 plot with an underwater camera. This process was repeated for 10 weeks.
 
-Photogrammetry will be used on Agisoft Professional to look at coral growth and predation marks.
+The camera footage was uploaded into Agisoft Metashape Professional to be converted into a 3D model. 
+
+I plan to take surface interval data of the corals inside the 1m\^2. I will be taking measurements of coral size, lesion size, and benthic percentage. 
+
 
 ![Figure No. 2. A photo of *Orbicella annularis* taken by Cheyenne L. Goodman](PHOTOS/GOODMAN_SCIENCE.JPG)
 
 ### Damselfish Collection
 
-All species of damselfish are required to be removed from designated plots. They are to be released to Perseverance Bay after capture.
+All species of damselfish are required to be removed from designated plots (Figure No. 2.). They are to be released to Perseverance Bay after capture.
+
+## Background data
+
+I am reviewing the Territorial Coral Reef Monitoring Program (TCRMP) dataset from 2013-2025 to investigate the frequency of coral-damselfish interactions, damselfish density changes, and macroalgal cover and height across the USVI. See statistical analysis to view these trends between 2013-2025.
+
+I am also reviewing the National Coral Reef Monitoring Program (NCRMP) to look beyond TCRMP sites to gain a better overview of damselfish density in the US Virgin Islands. 

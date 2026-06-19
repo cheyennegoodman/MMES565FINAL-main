@@ -3,7 +3,22 @@ title: "Introduction and Research Objectives"
 author: "Cheyenne Leila Goodman"
 ---
 
-![Figure No. 1. A photo of *Orbicella annularis* taken by Cheyenne L. Goodman](PHOTOS/OANN_PLOT_23.JPG)
+![Figure No. 1. A photo of Orbicella annularis taken by Cheyenne L. Goodman](PHOTOS/OANN_PLOT_23.JPG) 
+
+##UPDATES -
+
+16/06/2026: I republished and pushed my website back to github.
+
+I have added TCRMP 2025 data into statistics which includes: 
+- ANOVAs on Damselfish abundance across the USVI 
+- ANOVAs on Damselfish Species abundance across the USVI 
+- 2025 Coral-Interaction with 1 graph - Macroalgae code 
+- Edit Statistics, Methods, and Introduction section
+
+Next steps: 
+- Figure out Coral-Interaction data 
+- discuss if data can be manipulated to find statistical significance on damselfish species at TCRMP sites 
+- Rerun all maps and graphs to have density instead of abundance
 
 ## Introduction
 

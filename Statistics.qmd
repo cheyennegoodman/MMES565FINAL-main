@@ -10,32 +10,37 @@ execute:
   warning: false
 ---
 
-## Damselfish Population Trends from 2013-2021
+## Damselfish Population Trends from 2013-2025
 
-The Territorial Coral Reef Monitoring Program (TCRMP) has fish abundance and biomass data from 2002; however, records of damselfish-coral interactions do not consistently begin until 2013 which is why I am looking at trends from 2013-2021.
+The Territorial Coral Reef Monitoring Program (TCRMP) has fish abundance and biomass data from 2002; however, records of damselfish-coral interactions are not consistent until 2013 which is why I am looking at trends from 2013-2025.
 
-All damselfish species found in the USVI were accounted for measuring the biomass and abundance at each TCRMP site. Two maps were created to look at the mean damselfish biomass/ abundance rom 2013 to 2021 (Figure No.1 and No.2). From the maps, it looks like St. Croix has a higher abundance of damselfish species throughout the years, but have medium biomass.
+TCRMP measures fish abundance by using ten transects (25 x 4 m) and three 15-minute roving surveys at each site per year. This map shows all damselfish species in abundance across the US Virgin Islands (Figure No. 1). 
 
-![Figure No. 1. The Average Damselfish Abundance from 2013-2021](PHOTOS/MAP_DAMSELFISH_ABUNDANCE.jpg)
+![Figure No. 1. The Average Damselfish Abundance from 2013-2021](PHOTOS/MAPS/MAP_DAMSELFISH_ABUNDANCE.jpg)
 
 ```{r}
 ####Libraries########
 library(tidyverse)
 library(readxl)
 library(ggplot2)
+library(car)
+library(emmeans)
+library(multcomp)
+library(MASS)
 
-#GOAL: average damselfish abundance for every site for the last 10 years 
+#GOAL: average damselfish abundance for every TCRMP site from 2013-2025
 
-TCRMP_FISH_METADATA <- read.csv("TCRMP_datasets/TCRMP_FISH/AUG2022/TCRMP_Master_Fish_Census_Aug2022.xlsx - MetaData.csv")
+TCRMP_SITE <- read.csv("TCRMP_datasets/TCRMP_Site_Metadata.xls - SiteMetadata.csv") # loading TCRMP SITE data
 
-TCRMP_FISH_RAW <- read.csv("TCRMP_datasets/TCRMP_FISH/AUG2022/TCRMP_Master_Fish_Census_Aug2022.xlsx - FishData.csv") # TCRMP FISH data
-
-CLEAN_TCRMP_FISH <- subset(TCRMP_FISH_RAW, select = -c(Month, SampleYear , Period, CommonName, X0.5, X6.10, X11.20, X21.30, X31.40, X41.50, X51.60, X61.70, X71.80, X81.90, X91.100)) %>% # removing excess columns 
-  mutate(Location = toupper(Location)) %>% #making all site names the same 
-  dplyr::filter(!dplyr::between(as.numeric (Year), 2003, 2012)) #filter data to 2013-2021 %>%
+TCRMP_FISH_RAW <- read.csv("TCRMP_datasets/TCRMP_FISH/APR2026/TCRMP_Master_Fish_Census_Apr2026_Abundance.csv") # TCRMP FISH data
 
 
-ABUND_DAMSEL <- dplyr::filter(CLEAN_TCRMP_FISH, Metric!= "Biomass" , # removing rows (biomass)
+TCRMP_FISH <- subset(TCRMP_FISH_RAW, select = -c(SampleDate, SampleMonth , Period, CommonName, Observer, TrophicGroup, X0.5, X6.10, X11.20, X21.30, X31.40, X41.50, X51.60, X61.70, X71.80, X81.90, X91.100, X101.110, X111.120, X121.130, X131.140, X141.150, X.150)) %>%  #removing excess columns
+  dplyr::filter(!dplyr::between(as.numeric (SampleYear), 2003, 2012)) #filter data to 2013-2025
+
+CLEAN_TCRMP_FISH <- left_join(TCRMP_FISH, TCRMP_SITE[, c("Location", "Depth", "Island" )], by = "Location") #attaching island names and depth to dataset
+
+TABUND_DAMSEL <- dplyr::filter(CLEAN_TCRMP_FISH,
                               ScientificName %in% c(
                                 "Microspathodon chrysurus",
                                 "Stegastes partitus",
@@ -43,246 +48,1274 @@ ABUND_DAMSEL <- dplyr::filter(CLEAN_TCRMP_FISH, Metric!= "Biomass" , # removing 
                                 "Stegastes adustus",
                                 "Stegastes leucostictus",
                                 "Stegastes planifrons"
-                              ))
-#############################################################################################################################################################
-TRANSECT_ABUNDANCE_MEAN_DAMSELFISH <- ABUND_DAMSEL %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
+                              )) # filter fish species to damselfish only
+##########################################################################################################################################################
+#####################  DAMSELFISH DENSITY       #############################
+
+TTRANS_MEAN_ABUND_DAMSEL <- TABUND_DAMSEL %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
   summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
+    Sum_Abundance= sum(SppTotal),
+    Mean_Abundance  = mean(SppTotal) ,
     .groups = "drop") %>% 
   unique()
 
-ABUNDANCE_DAMSELFISH <- TRANSECT_ABUNDANCE_MEAN_DAMSELFISH  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
+TABUNDANCE_DAMSELFISH <- TTRANS_MEAN_ABUND_DAMSEL  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
   summarise(
     Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
   )
 
-MAP_ABUND_DAMSELFISH <- ABUNDANCE_DAMSELFISH  %>% # Mean of damselfish biomass along each site 
+TMAP_ABUNDANCE_DAMSELFISH <- TABUNDANCE_DAMSELFISH  %>% # Mean of damselfish Abundance along each site 
   group_by(Location)  %>% 
   summarise(
     Location_Abundance_mean = (mean(Location_Abundance_mean))
   )
 
-# print(head(MAP_ABUND_DAMSELFISH)) # map stuff
-##############################################################################################################################################################
-
-
-############# St. Thomas ############################
-STT_ADAMS <- dplyr::filter(ABUND_DAMSEL, #Only including St. Thomas sites
-                           Location %in% c(
-                               "BLACK POINT",
-                               "BREWERS BAY",
-                               "FLAT CAY",
-                               "BUCK ISLAND STT",
-                               "SOUTH WATER",
-                               "SOUTH CAPELLA",
-                               "SEAHORSE COTTAGE SHOAL",
-                               "ST JAMES",
-                               "COCULUS ROCK",
-                               "MAGENS BAY",
-                               "BOTANY BAY",
-                               "SAVANA",
-                               "GRAMMANIK TIGER FSA",
-                               "COLLEGE SHOAL EAST",
-                               "GINGSBURG FRINGE"
-                             ))
+##################### St. Thomas ############################
+STT_ADAMS <- dplyr::filter(TABUND_DAMSEL, #Only including St. Thomas sites
+                          Island %in% c(
+                             "STT"
+                           ))
 
 STT_TAMD <- STT_ADAMS %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
+  group_by(Location, Transect, SampleYear) %>% 
   summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
+    Mean_Abundance = mean(SppTotal) ,
     .groups = "drop") %>% 
   unique()
 
-STT_ABUNDANCE_DAMSELFISH <- STT_TAMD  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
+TSTT_ABUNDANCE_DAMSELFISH <- STT_TAMD  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
   summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
   )
 
-STT_ABUNDANCE_PLOT <- ggplot(STT_ABUNDANCE_DAMSELFISH, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) +  # damselfish abundance from 2013-2022 on St Thomas
+TSTT_ABUNDANCE_LPLOT <- ggplot(TSTT_ABUNDANCE_DAMSELFISH, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) +
   geom_line() +
-  scale_x_continuous(breaks = seq(min(STT_ABUNDANCE_DAMSELFISH$Year), max(STT_ABUNDANCE_DAMSELFISH$Year), by = 1)) +
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
+  scale_x_continuous(breaks = seq(min(TSTT_ABUNDANCE_DAMSELFISH$SampleYear), max(TSTT_ABUNDANCE_DAMSELFISH$SampleYear), by = 1)) +
+  labs(title = "Damselfish Abundance at St. Thomas TCRMP Sites From 2013-2025") +
+  labs(x = "Year", y= "Damselfish Mean Abundance") +
+  labs(caption = "Figure No. 3. Average Damselfish Abundance of TCRMP Sites on St. Thomas, USVI from 2013-2025") +
   theme_minimal() +
+  theme(plot.caption = element_text(hjust = 0.5)) +
   theme(legend.position = "right") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
 ################# St. Croix #####################
 
-SX_ADAMS <- dplyr::filter(ABUND_DAMSEL, #Only including St. Thomas sites
-                          Location %in% c(
-                            "BUCK ISLAND STX",
-                            "BUCK ISLAND STX DEEP",
-                            "LANG BANK EEMP",
-                            "HIND BANK EAST FSA",
-                            "JACKS BAY",
-                            "CASTLE",
-                            "GREAT POND",
-                            "LANG BANK RED HIND FSA",
-                            "MUTTON SNAPPER FSA",
-                            "KINGS CORNER",
-                            "CANE BAY",
-                            "SALT RIVER",
-                            "EAGLE RAY"
+STX_ADAMS <- dplyr::filter(TABUND_DAMSEL, #Only including St. Thomas sites
+                          Island %in% c(
+                            "STX"
                           ))
 
-STX_TAMD <- SX_ADAMS %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
+STX_TAMD <- STX_ADAMS %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
   summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
+    Mean_Abundance = mean(SppTotal) ,
     .groups = "drop") %>% 
   unique()
 
-STX_ABUNDANCE_DAMSELFISH <- STX_TAMD  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
+TSTX_ABUNDANCE_DAMSELFISH <- STX_TAMD  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
   summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
   )
 
-STX_ABUNDANCE_PLOT <- ggplot(STX_ABUNDANCE_DAMSELFISH, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) + 
+TSTX_ABUNDANCE_LPLOT <- ggplot(TSTX_ABUNDANCE_DAMSELFISH, aes(x=SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) + 
   geom_line() +
-  scale_x_continuous(breaks = seq(min(STX_ABUNDANCE_DAMSELFISH$Year), max(STX_ABUNDANCE_DAMSELFISH$Year), by = 1)) + # damselfish abundance from 2013-2022 on St Croix 
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
+  scale_x_continuous(breaks = seq(min(TSTX_ABUNDANCE_DAMSELFISH$SampleYear), max(TSTX_ABUNDANCE_DAMSELFISH$SampleYear), by = 1)) + # damselfish abundance from 2013-2025 on St Croix 
+  labs(title = "Damselfish Abundance at St. Croix TCRMP Sites From 2013-2025") +
+  labs(x= "Year", y= "Damselfish Mean Abundance") +
+  labs(caption = "Figure No. 6. Average Damselfish Abundance at TCRMP Sites on St. Croix, USVI from 2013-2025") +
   theme_minimal() +
   theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
 ############## ST. JOHN ######################
 
-SJ_ADAMS <- dplyr::filter(ABUND_DAMSEL, #Only including St. Thomas sites
-                          Location %in% c(
-                            "MERI SHOAL",
-                            "FISH BAY",
-                            "CORAL BAY"
+STJ_ADAMS <- dplyr::filter(TABUND_DAMSEL, #Only including St. Thomas sites
+                           Island %in% c(
+                             "STJ"
                           ))
 
-
-STJ_TAMD <- SJ_ADAMS %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
+TSTJ_TAMD <- STJ_ADAMS %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
   summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
+    Mean_Abundance  = mean(SppTotal) ,
     .groups = "drop") %>% 
   unique()
 
-STJ_ABUNDANCE_DAMSELFISH <- STJ_TAMD  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
+TSTJ_ABUNDANCE_DAMSELFISH <- TSTJ_TAMD  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
   summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
   )
 
-STJ_ABUNDANCE_PLOT <- ggplot(STJ_ABUNDANCE_DAMSELFISH, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) + 
-  geom_line() + # damselfish abundance from 2013-2022 on St John
-  scale_x_continuous(breaks = seq(min(STJ_ABUNDANCE_DAMSELFISH$Year), max(STJ_ABUNDANCE_DAMSELFISH$Year), by = 1)) +
+TSTJ_ABUNDANCE_LPLOT <- ggplot(TSTJ_ABUNDANCE_DAMSELFISH, aes(x=SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) + 
+  geom_line() + # damselfish abundance from 2013-2025 on St John
+  scale_x_continuous(breaks = seq(min(TSTJ_ABUNDANCE_DAMSELFISH$SampleYear), max(TSTJ_ABUNDANCE_DAMSELFISH$SampleYear), by = 1)) +
+  labs(title = "Damselfish Abundance at St. John TCRMP Sites From 2013-2025") +
   labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
+  labs(caption = "Figure No. 5. Average Damselfish Abundance at TCRMP Sites St. John, USVI from 2013-2025") +
   theme_minimal() +
+  theme(plot.caption = element_text(hjust = 0.5)) +
   theme(legend.position = "right") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
-```
+############################################################################################################################################################################# DAMSELFISH ABUNDANCE BY ISLAND #########################
 
-```{r}
-STT_ALL_ABUNDANCE_DAMSELFISH <- STT_ABUNDANCE_DAMSELFISH  %>% # Mean of damselfish abundance on St. Thomas from 2013-2021
-  group_by(Year)  %>% 
+################## St. Thomas #################
+
+TSTT_ALL_ABUNDANCE_DAMSELFISH <- TSTT_ABUNDANCE_DAMSELFISH  %>% # Mean of damselfish abundance on St. Thomas from 2013-2025
+  group_by(SampleYear)  %>% 
   summarise(
-    Abundance_mean = (mean(Location_Abundance_mean))
+    Abundance_Mean = (mean(Location_Abundance_Mean))
   )
 
-STT_ALL_ABUNDANCE_DAMSELFISH_PLOT <- ggplot(STT_ALL_ABUNDANCE_DAMSELFISH, aes(x = Year , y = Abundance_mean)) + 
-  geom_line() + # damselfish abundance from 2013-2022 on St Thomas 
-  scale_x_continuous(breaks = seq(min(STT_ALL_ABUNDANCE_DAMSELFISH$Year), max(STT_ALL_ABUNDANCE_DAMSELFISH$Year), by = 1)) + 
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. St. Thomas Average Damselfish Abundance Per Year") +
+TSTT_ALL_ABUNDANCE_DAMSELFISH_LPLOT <- ggplot(TSTT_ALL_ABUNDANCE_DAMSELFISH, aes(x = SampleYear , y = Abundance_Mean)) + 
+  geom_line() + # damselfish abundance from 2013-2025 on St Thomas 
+  scale_x_continuous(breaks = seq(min(TSTT_ALL_ABUNDANCE_DAMSELFISH$SampleYear), max(TSTT_ALL_ABUNDANCE_DAMSELFISH$SampleYear), by = 1)) + 
+  labs(x= "Year", y= " Damselfish Mean Abundance") +
+  labs(caption = "Figure No. ?. St. Thomas Average Damselfish Abundance From 2013-2025") +
   theme_minimal() +
+  theme(plot.caption = element_text(hjust = 0.5)) +
   theme(legend.position = "right") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
 ################ ST. CROIX ###################
 
-STX_ALL_ABUNDANCE_DAMSELFISH <- STX_ABUNDANCE_DAMSELFISH  %>% # Mean of damselfish abundance on St. Croix from 2013-2021
-  group_by(Year)  %>% 
+TSTX_ALL_ABUNDANCE_DAMSELFISH <- TSTX_ABUNDANCE_DAMSELFISH  %>% # Mean of damselfish abundance on St. Croix from 2013-2025
+  group_by(SampleYear)  %>% 
   summarise(
-    Abundance_mean = (mean(Location_Abundance_mean))
+    Abundance_Mean = (mean(Location_Abundance_Mean))
   )
 
-STX_ALL_ABUNDANCE_DAMSELFISH_PLOT <- ggplot(STX_ALL_ABUNDANCE_DAMSELFISH, aes(x = Year , y = Abundance_mean)) + 
-  geom_line() + # damselfish abundance from 2013-2022 on St Croix 
-  scale_x_continuous(breaks = seq(min(STX_ALL_ABUNDANCE_DAMSELFISH$Year), max(STX_ALL_ABUNDANCE_DAMSELFISH$Year), by = 1)) + 
+TSTX_ALL_ABUNDANCE_DAMSELFISH_LPLOT <- ggplot(TSTX_ALL_ABUNDANCE_DAMSELFISH, aes(x = SampleYear , y = Abundance_Mean)) + 
+  geom_line() + # damselfish abundance from 2013-2025 on St Croix 
+  scale_x_continuous(breaks = seq(min(TSTX_ALL_ABUNDANCE_DAMSELFISH$SampleYear), max(TSTX_ALL_ABUNDANCE_DAMSELFISH$SampleYear), by = 1)) + 
   labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. St. Thomas Average Damselfish Abundance Per Year") +
+  labs(caption = "Figure No. ?. St. Croix Average Damselfish Abundance From 2013-2025") +
   theme_minimal() +
+  theme(plot.caption = element_text(hjust = 0.5)) +
   theme(legend.position = "right") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
 ################# ST. JOHN #########################
 
-STJ_ALL_ABUNDANCE_DAMSELFISH <- STJ_ABUNDANCE_DAMSELFISH  %>% # Mean of damselfish abundance on St. John from 2013-2021
-  group_by(Year)  %>% 
+TSTJ_ALL_ABUNDANCE_DAMSELFISH <- TSTJ_ABUNDANCE_DAMSELFISH  %>% # Mean of damselfish abundance on St. John from 2013-2021
+  group_by(SampleYear)  %>% 
   summarise(
-    Abundance_mean = (mean(Location_Abundance_mean))
+    Abundance_Mean = (mean(Location_Abundance_Mean))
   )
 
-STJ_ALL_ABUNDANCE_DAMSELFISH_PLOT <- ggplot(STJ_ALL_ABUNDANCE_DAMSELFISH, aes(x = Year , y = Abundance_mean)) + 
+STJ_ALL_ABUNDANCE_DAMSELFISH_LPLOT <- ggplot(TSTJ_ALL_ABUNDANCE_DAMSELFISH, aes(x = SampleYear , y = Abundance_Mean)) + 
   geom_line() + # damselfish abundance from 2013-2022 on St John 
-  scale_x_continuous(breaks = seq(min(STJ_ALL_ABUNDANCE_DAMSELFISH$Year), max(STJ_ALL_ABUNDANCE_DAMSELFISH$Year), by = 1)) + 
+  scale_x_continuous(breaks = seq(min(TSTJ_ALL_ABUNDANCE_DAMSELFISH$SampleYear), max(TSTJ_ALL_ABUNDANCE_DAMSELFISH$SampleYear), by = 1)) + 
   labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. St. Thomas Average Damselfish Abundance Per Year") +
+  labs(caption = "Figure No. ?. St. John Average Damselfish Abundance From 2013-2025") +
   theme_minimal() +
+  theme(plot.caption = element_text(hjust = 0.5)) +
   theme(legend.position = "right") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
 ######### MERGING THEM TOGETHER ############
-
 ##adding columns of site to each dataset
 
-STT_ALL_ABUNDANCE_DAMSELFISH$Site <- "St. Thomas"
-STX_ALL_ABUNDANCE_DAMSELFISH$Site <- "St. Croix"
-STJ_ALL_ABUNDANCE_DAMSELFISH$Site <- "St. John"
+TSTT_ALL_ABUNDANCE_DAMSELFISH$Site <- "St. Thomas"
+TSTX_ALL_ABUNDANCE_DAMSELFISH$Site <- "St. Croix"
+TSTJ_ALL_ABUNDANCE_DAMSELFISH$Site <- "St. John"
 
 
-USVI_ABUNDANCE <- bind_rows(STT_ALL_ABUNDANCE_DAMSELFISH ,
-  STJ_ALL_ABUNDANCE_DAMSELFISH, 
-  STX_ALL_ABUNDANCE_DAMSELFISH)
+TUSVI_ABUNDANCE <- bind_rows(TSTT_ALL_ABUNDANCE_DAMSELFISH ,
+                            TSTX_ALL_ABUNDANCE_DAMSELFISH, 
+                            TSTJ_ALL_ABUNDANCE_DAMSELFISH)
 
-USVI_ABUNDANCE_PLOT <- ggplot(USVI_ABUNDANCE, aes(x = Year , y = Abundance_mean, group = Site , color = Site)) + 
-  geom_line() + # damselfish abundance from 2013-2022 on USVI
-  scale_x_continuous(breaks = seq(min(USVI_ABUNDANCE$Year), max(USVI_ABUNDANCE$Year), by = 1)) + 
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. USVI Average Damselfish Abundance Per Year") +
+TUSVI_ABUNDANCE_LPLOT <- ggplot(TUSVI_ABUNDANCE, aes(x = SampleYear , y = Abundance_Mean, group = Site , color = Site)) + 
+  geom_line() + # damselfish abundance from 2013-2025 in USVI
+  scale_color_manual( values = c( 
+    "St. Thomas" = "coral" ,
+    "St. John" = "green3" , 
+    "St. Croix" = "cyan2" 
+  )) +
+  scale_x_continuous(breaks = seq(min(TUSVI_ABUNDANCE$SampleYear), max(TUSVI_ABUNDANCE$SampleYear), by = 1)) + 
+  labs(title = " Average Damselfish Abundance Across US Virgin Islands From 2013-2025") +
+  labs(x= "Year", y= "Damselfish Mean Abundance") +
+  labs(caption = "Figure No. 2. Average Damselfish Abundance From 2013-2025 Using TCRMP Sites Across the USVI By Island") +
   theme_minimal() +
   theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-print(USVI_ABUNDANCE_PLOT)
+print(TUSVI_ABUNDANCE_LPLOT)
+#########################################################################################################################################################################################
+## ANOVA 
+TUSVI_ABUNDANCE$Abundance_Log <- log(TUSVI_ABUNDANCE$Abundance_Mean) # log it 
+TUSVI_ADAM_ANOVA <- aov(Abundance_Log ~ Site, data = TUSVI_ABUNDANCE)
+#summary(TUSVI_ADAM_ANOVA)
+# CURRENT ANOVA BELOW 
+#           Df Sum Sq Mean Sq F value   Pr(>F)    
+#Site         2  1.677  0.8387   17.98 3.85e-06 ***
+#Residuals   36  1.679  0.0466      
 
+### POSTHOC
+TUKEY_USVI_ADAM_ANOVA <- TukeyHSD(TUSVI_ADAM_ANOVA)
+
+ TIsland_ANOVA<- emmeans(TUSVI_ADAM_ANOVA, ~ Site)
+ 
+ TISLAND_POSTHOC <- cld(TIsland_ANOVA, Letter = letters)
+ 
+ TISLAND_POSTHOC$.group <- trimws(TISLAND_POSTHOC$.group)
+
+ TISLAND_POSTHOC$y_pos <- min(TUSVI_ADAM_ANOVA$Abundance_Log, na.rm = TRUE) * 1.1
+ 
+TUSVI_ADAM_BPLOT <- ggplot(TUSVI_ADAM_ANOVA, aes(x = Site , y = Abundance_Log , fill = Site )) +
+  geom_boxplot() +
+  geom_text(data = TISLAND_POSTHOC,
+            aes(x = Site,
+                y = y_pos,
+                label = .group),
+            vjust = 2.1 ,
+            inherit.aes = FALSE,
+            size = 6) +
+  scale_fill_manual(values = c(
+    "St. Thomas" = "coral",
+    "St. John"   = "green2",
+    "St. Croix"  = "cyan2")) +
+  scale_y_continuous(limits = c(1.75, 4)) +
+  labs(title = "Damselfish Mean Abundance Across TCRMP Sites From 2013-2025") +
+  labs( x = "Island" , y = "Damselfish Mean Abundance log(Abundance)") +
+  labs(caption = "Figure No. 3. Post Hoc test of Damselfish abundance on St. Thomas, St. John and St. Croix at TCRMP sites from 2013-2025.") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(TUSVI_ADAM_BPLOT)
+
+```
+Data was visualized of damselfish abundance from 2013-2025 on each island (Figure No. 2). An ANOVA was conducted and revealed the islands have significantly different damselfish abundance and a post-hoc test determined St. Croix has a different average damselfish abundance than St. Thomas and St. John (Figure No. 3). This data set passed the bartlett test (p-value = 0.1889) and Shapiro-Wilks test (p-value = 0.9736) when preformed under a log transformation. 
+
+::: panel-tabset
+## St. Thomas
+
+```{r}
+print(TSTT_ABUNDANCE_LPLOT) # St. Thomas Damselfish Abundance 2013-2025
+```
+
+## St. John
+
+```{r}
+print(TSTJ_ABUNDANCE_LPLOT) # St. John Damselfish Abundance 2013-2025
+```
+
+## St. Croix
+
+```{r}
+print(TSTX_ABUNDANCE_LPLOT)
+# St. Croix Damselfish Abundance 2013-2025
+```
+:::
+
+ANOVAs were conduct to analyze damselfish abundance across TCRMP sites on each island. 
+
+The dataset for St. Thomas does not pass the barlette test after being transformed (p-value = 0.004478). It meets the
+
+::: panel-tabset
+## St. Thomas
+
+```{r}
+
+TSTT_ABUNDANCE_DAMSELFISH$Abundance_Log <- log(TSTT_ABUNDANCE_DAMSELFISH$Location_Abundance_Mean) # log it 
+
+TSTT_ADAM_ANOVA <- aov(Abundance_Log ~ Location, data = TSTT_ABUNDANCE_DAMSELFISH)
+
+#summary(TSTT_ADAM_ANOVA) # location is significantly different from one another: P-value = 1.04e-13
+#             Df Sum Sq Mean Sq F value   Pr(>F)    
+#Location     13  20.10  1.5463   8.915 1.04e-13 ***
+# Residuals   166  28.79  0.1735   
+TUK_TSTT_ADAM_ANOVA <- TukeyHSD(TSTT_ADAM_ANOVA)
+
+TSTT_ANOVA <- emmeans(TSTT_ADAM_ANOVA, ~ Location)
+
+TSTT_POSTHOC <- cld(TSTT_ANOVA, Letter = letters)
+
+TSTT_POSTHOC$.group <- trimws(TSTT_POSTHOC$.group)
+
+TSTT_POSTHOC$y_pos <- max(TSTT_ABUNDANCE_DAMSELFISH$Abundance_Log, na.rm = TRUE) * 1.1
+
+
+TSTT_ADAM_BPLOT <- ggplot(TSTT_ABUNDANCE_DAMSELFISH, aes(x = Location , y = Abundance_Log , fill = Location )) +
+          geom_boxplot() +
+          geom_text(data = TSTT_POSTHOC,
+                    aes(x = Location,
+                        y = y_pos,
+                        label = .group),
+                    vjust = 2.1 ,
+                    inherit.aes = FALSE,
+                    size = 6) +
+          labs(title = "Damselfish Mean Abundance Across TCRMP Sites on St. Thomas, USVI From 2013-2025") +
+          labs( x = "Island" , y = "Damselfish Mean Abundance log(Abundance)") +
+          theme_minimal() +
+          theme(plot.caption = element_text(hjust = 0.5)) +
+          theme(legend.position = "bottom") +
+          theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(TSTT_ADAM_BPLOT)
+    
+
+```
+
+## St. John
+
+```{r}
+
+TSTJ_ABUNDANCE_DAMSELFISH$Abundance_Log <- log(TSTJ_ABUNDANCE_DAMSELFISH$Location_Abundance_Mean) # log it 
+
+#bartlett.test(Abundance_Log ~ Location, data = TSTJ_ABUNDANCE_DAMSELFISH) 
+# p-value = 0.9652, i fail to reject the hypothesis. This data has homogenity of variances. 
+
+#shapiro.test(TSTJ_ABUNDANCE_DAMSELFISH$Abundance_Log)
+#p-value = 0.1746, I fail to reject the hypothesis, this data has normality of residuals
+
+TSTJ_ADAM_ANOVA <- aov(Abundance_Log ~ Location, data = TSTJ_ABUNDANCE_DAMSELFISH)
+#summary(TSTJ_ADAM_ANOVA)
+# P-value = 8.42e-11, There is signifigant differences in damselfish abundance across St. John TCRMP sites. 
+#            Df Sum Sq Mean Sq F value   Pr(>F)    
+#Location     2 11.614   5.807   47.31 8.42e-11 ***
+#Residuals   36  4.419   0.123      
+
+TUK_TSTJ_ADAM_ANOVA <- TukeyHSD(TSTJ_ADAM_ANOVA)
+
+# Fish Bay has signifgantly different damselfish abundance compared to the other St. John TCRMP sites
+
+TSTJ_ANOVA<- emmeans(TSTJ_ADAM_ANOVA, ~ Location)
+
+TSTJ_POSTHOC <- cld(TSTJ_ANOVA, Letter = letters)
+
+TSTJ_POSTHOC$.group <- trimws(TSTJ_POSTHOC$.group)
+
+TSTJ_POSTHOC$y_pos <- min(TSTJ_ABUNDANCE_DAMSELFISH$Abundance_log, na.rm = TRUE) * 1.1
+
+TSTJ_ADAM_BPLOT <- ggplot(TSTJ_ABUNDANCE_DAMSELFISH, aes(x = Location , y = Abundance_Log , fill = Location )) +
+  geom_boxplot() +
+  geom_text(data = TSTJ_POSTHOC,
+            aes(x = Location,
+                y = y_pos,
+                label = .group),
+            vjust = 1.1 ,
+            inherit.aes = FALSE,
+            size = 6) +
+  scale_y_continuous(limits = c(0, 4)) +
+    theme(plot.caption = element_text(hjust = 0.5)) +
+  labs(title = " Damselfish Mean Abundance Across TCRMP Sites on St. John From 2013-2025") +
+  labs( x = "Location" , y = "Damselfish Mean Abundance log(Abundance)") +
+  theme_minimal() +
+    theme(legend.position = "bottom") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(TSTJ_ADAM_BPLOT)
+
+
+```
+
+## St. Croix
+
+```{r}
+
+TSTX_ABUNDANCE_DAMSELFISH$Abundance_Log <- log(TSTX_ABUNDANCE_DAMSELFISH$Location_Abundance_Mean) # log it 
+
+#bartlett.test(Abundance_Log ~ Location, data = TSTX_ABUNDANCE_DAMSELFISH) 
+#p-value = 0.9464, failed to reject hypothesis
+
+#shapiro.test(TSTX_ABUNDANCE_DAMSELFISH$Abundance_Log)
+# p-value =  p-value = 0.01692, REJECT the hypothesis
+
+
+TSTX_ADAM_ANOVA <- aov(Abundance_Log ~ Location, data = TSTX_ABUNDANCE_DAMSELFISH)
+#summary(TSTX_ADAM_ANOVA)
+#P-value is <2e-16, St. Croix TCRMP sites has signifgantly different damselfish abundances
+#             Df Sum Sq Mean Sq F value Pr(>F)    
+#Location     11  61.17   5.561    30.5 <2e-16 ***
+#Residuals   139  25.35   0.182                   
+TUK_TSTX_ADAM_ANOVA <- TukeyHSD(TSTX_ADAM_ANOVA)
+
+TSTX_ANOVA <- emmeans(TSTX_ADAM_ANOVA, ~ Location)
+
+TSTX_POSTHOC <- cld(TSTX_ANOVA, Letter = letters)
+
+TSTX_POSTHOC$.group <- trimws(TSTX_POSTHOC$.group)
+
+TSTX_POSTHOC$y_pos <- max(TSTX_ABUNDANCE_DAMSELFISH$Abundance_Log, na.rm = TRUE) * 1.1
+
+
+TSTX_ADAM_BPLOT <- ggplot(TSTX_ABUNDANCE_DAMSELFISH, aes(x = Location , y = Abundance_Log , fill = Location )) +
+  geom_boxplot() +
+  geom_text(data = TSTX_POSTHOC,
+            aes(x = Location,
+                y = y_pos,
+                label = .group),
+            inherit.aes = FALSE,
+            size = 6) +
+  labs(title = "Damselfish Mean Abundance at TCRMP Sites on St. Croix") +
+  labs( x = "Location" , y = "Damselfish Mean Abundance log(Abundance)") +
+  labs(caption = "This dataset did not pass Shapiro-Wilk test") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(TSTX_ADAM_BPLOT)
+```
+:::
+
+## Damselfish Distrubution By Species
+
+There are six damselfish species native to the Caribbean. These fish are small \<10cm. Damselfishes are detrivores, omnivores, and primarily herbivores.
+
+5/6 damselfish species are considered "farmerfish". They create algal farms within their 1m\^2 territories by propgating algae and attaching it to corals or hard substrate. They guard these algal gardens.
+
+Damselfish are considered solitary fish with aggressive behaviors. They are seen attacking and chasing other marine animals when they feel threatened or if the animal is too close to their algal gardens.
+
+### Stegates Planifrons (Threespot Damselfish)
+
+![Figure No. ?. An example of an Adult Stegates planifrons.](PHOTOS/FISH/DAMSELFISH_EXAMPLE.JPG)
+
+Stegates planifrons are Adults have brownish-black body with a yellow-gray underbelly and juveniles are fully yellow. and notably more aggressive than other species of damselfish. T
+
+```{r}
+TABUND_SP <- dplyr::filter(CLEAN_TCRMP_FISH, ScientificName %in% c(
+                            "Stegastes planifrons"
+                          ))
+
+#######################################################################################################################################################################  STEGATES PLANIFRONS ACROSS USVI ##############################
+
+TUSVI_TAMSP <- TABUND_SP %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Island = Island ,
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TUSVI_ABUNDANCE_SP <- TUSVI_TAMSP  %>% # Mean of damselfish abundance along each site per year and Island
+  group_by(Island, SampleYear)  %>% 
+  summarise(
+    Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TUSVIABUNDANCE_SP_LPLOT <- ggplot(TUSVI_ABUNDANCE_SP, aes(x = SampleYear , y = Abundance_Mean, group= Island, color = Island)) +
+  geom_line() +
+  scale_color_manual(values = c(
+    "STT" = "coral",
+    "STJ"   = "green2",
+    "STX"  = "cyan2")) +
+  scale_x_continuous(breaks = seq(min(TUSVI_ABUNDANCE_SP$SampleYear), max(TUSVI_ABUNDANCE_SP$SampleYear), by = 1)) +
+  labs(title = "Average Stegates planifrons Abundance at TCRMP Sites in the USVI from 2013-2025") +
+  labs(x= "Year", y= "Stegates planifrons Mean Abundance") +
+  labs(caption = "Figure No. ?. Average stegates planifrons abundance at TCRMP sites from 2013-2025. These sites are located on St. Thomas (STT), St. Croix (STX), and St. John (STJ).") +
+  theme_minimal() +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(legend.position = "right") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+################################################################################################################################################################## STEGATES PLANIFRONS ABUNDANCE BY ISLAND ############################
+
+################# ST. THOMAS ########################################
+TSTT_ASP <- dplyr::filter(TABUND_SP, #Only including St. Thomas sites
+                         Island %in% c(
+                           "STT"
+                         ))
+
+TSTT_TAMSP <- TSTT_ASP %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TSTT_ABUNDANCE_SP <- TSTT_TAMSP  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
+  summarise(
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TSTT_ABUNDANCE_SP_LPLOT <- ggplot(TSTT_ABUNDANCE_SP, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) + # St. Thomas plot of Stegates planiforns from 2013-2025
+  geom_line() +
+  scale_x_continuous(breaks = seq(min(TSTT_ABUNDANCE_SP$SampleYear), max(TSTT_ABUNDANCE_SP$SampleYear), by = 1)) +
+  labs(title = "Average Stegates Planifrons Abundance at St. Thomas from 2013-2025") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  labs(x= "Year", y= "Stegates planifrons Mean Abundance") +
+  labs(caption = "Figure No. ?. Average Stegates planifrons Abundance at St. Thomas TCRMP sites from 2013-2025.") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+################# ST. CROIX ############################
+
+TSTX_ASP <- dplyr::filter(TABUND_SP, #Only including St. Croix sites
+                        Island %in% c(
+                          "STX"
+                        ))
+
+TSTX_TAMSP <- TSTX_ASP %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TSTX_ABUNDANCE_SP <- TSTX_TAMSP  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
+  summarise(
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TSTX_ABUNDANCE_SP_LPLOT <- ggplot(TSTX_ABUNDANCE_SP, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) + # St. Croix plot of Stegates planifrons from 2013-2025
+  geom_line() +
+  scale_x_continuous(breaks = seq(min(TSTX_ABUNDANCE_SP$SampleYear), max(TSTX_ABUNDANCE_SP$SampleYear), by = 1)) +
+  labs(title = "Average Stegates Planifrons Abundance at St. Croix from 2013-2025") +
+  labs(x= "Year", y= "Stegates planifrons Mean Abundance") +
+  labs(caption = "Figure No. ?. Average Stegates planifrons Abundance at St. Croix TCRMP sites from 2013-2025.") +
+  theme_minimal() +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(legend.position = "right") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+#################### ST. JOHN ################################
+
+TSTJ_ADAMSP <- dplyr::filter(TABUND_SP, #Only including St. John sites
+                           Island %in% c(
+                             "STJ"
+                           ))
+
+
+TSTJ_TAMSP <- TSTJ_ADAMSP %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TSTJ_ABUNDANCE_SP <- TSTJ_TAMSP  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
+  summarise(
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TSTJ_ABUNDANCE_SP_LPLOT <- ggplot(TSTJ_ABUNDANCE_SP, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) + # Plot of St. John sites and damselfish abundance
+  geom_line() +
+  scale_x_continuous(breaks = seq(min(TSTJ_ABUNDANCE_SP$SampleYear), max(TSTJ_ABUNDANCE_SP$SampleYear), by = 1)) +
+  labs(title = "Average Stegates Planifrons Abundance at St. John from 2013-2025")+
+  labs(x= "Year", y= "Stegates planifrons Mean Abundance") +
+  labs(caption = "Figure No. ?. Average Stegates planifrons Abundance at St. John TCRMP sites from 2013-2025.") +
+  theme_minimal() +
+    theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(legend.position = "right") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+############################################################################################################################################################################################################################################################### STATS TIME #######################################
+
+# Is there a significance difference of SP abundance across the islands in the USVI?
+
+### ASUMPTIONS 
+
+#1.) Homoscedasticity
+#bartlett.test(Abundance_Mean ~ Island, data = TUSVI_ABUNDANCE_SP) 
+
+# p-value = 7.404e-05, I reject the hypothesis. This dataset DOES NOT HAVE homogenity of variances
+
+TUSVI_ABUNDANCE_SP$Abundance_Log <- log(TUSVI_ABUNDANCE_SP$Abundance_Mean) # log it 
+#bartlett.test(Abundance_Log ~ Island, data = TUSVI_ABUNDANCE_SP) 
+#p-value = 0.4195, I reject to fail the hypothesis, the log version has homogenity of variances
+
+#2.) Normality
+#shapiro.test(TUSVI_ABUNDANCE_SP$Abundance_Log)
+#p-value = 0.01415 , DOES NOT PASS, USE CAUTION
+
+TUSVI_ASP_ANOVA <- aov(Abundance_Log ~ Island, data = TUSVI_ABUNDANCE_SP)
+#summary(TUSVI_ASP_ANOVA)
+#            Df Sum Sq Mean Sq F value   Pr(>F)    
+#Island       2 17.219   8.609   77.64 8.78e-14 ***
+#Residuals   36  3.992   0.111   
+# SP abundance is significantly different across the USVI
+
+################### POST HOC ###################
+
+TUK_TUSVI_ASP_ANOVA <- TukeyHSD(TUSVI_ASP_ANOVA)
+
+TUSVI_Island_ANOVA<- emmeans(TUSVI_ASP_ANOVA, ~ Island)
+
+TUSVI_ISLAND_POSTHOC <- cld(TUSVI_Island_ANOVA, Letter = letters)
+
+TUSVI_ISLAND_POSTHOC$.group <- trimws(TUSVI_ISLAND_POSTHOC$.group)
+
+TUSVI_ISLAND_POSTHOC$Post_Hoc <- min(TUSVI_ASP_ANOVA$Abundance_Log, na.rm = TRUE) * 1.1
+
+TUSVI_ASP_BPLOT <- ggplot(TUSVI_ASP_ANOVA, aes(x = Island , y = Abundance_Log , fill = Island)) +
+  geom_boxplot() +
+  geom_text(data = TUSVI_ISLAND_POSTHOC,
+            aes(x = Island,
+                y = Post_Hoc,
+                label = .group),
+            vjust = 2.1 ,
+            inherit.aes = FALSE,
+            size = 6) +
+  scale_y_continuous(limits = c(0, 6)) +
+  scale_fill_manual(values = c(
+    "STT" = "coral",
+    "STJ"   = "green2",
+    "STX"  = "cyan2")) +
+  labs(title = "Stegates planifrons Mean Abundance Across TCRMP Sites From 2013-2025") +
+  labs(caption = "Stegates planifrons Mean Abundance on St. Thomas (STT), St. Croix (STX), and St. John(STJ). This data did not pass the Shapiro-Wilks test.") +
+  labs(x = "Island" , y = "Stegates planifrons Mean Abundance log(Abundance)") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+::: panel-tabset
+## US Virgin Islands
+
+```{r}
+print(TUSVIABUNDANCE_SP_LPLOT)
+```
+
+## Post-Hoc Box Plot
+
+```{r}
+print(TUSVI_ASP_BPLOT) 
+```
+
+:::
+No analysis on species abundance on TCRMP sites have been conducted. Data does not meet assumptions. 
+::: panel-tabset
+## St. Thomas
+
+```{r}
+print(TSTT_ABUNDANCE_SP_LPLOT)
+```
+
+## St. John
+
+```{r}
+print(TSTJ_ABUNDANCE_SP_LPLOT) # St. John plot
+```
+
+## St. Croix
+
+```{r}
+print(TSTX_ABUNDANCE_SP_LPLOT) # St. Croix plot
+```
+:::
+
+### Stegates Variabilis (Cocoa Damselfish)
+
+![Figure No. ?. An example of an Adult Stegates variabilis.](PHOTOS/FISH/DAMSELFISH_COCOA.PNG)
+
+
+```{r}
+TABUND_SV <- dplyr::filter(CLEAN_TCRMP_FISH,
+                          ScientificName %in% c(
+                            "Stegastes variabilis"
+                          ))
+
+####################################################################################################################################################################  STEGATES VARIABILIS ACROSS USVI ##############################
+
+TUSVI_TAMSV <- TABUND_SV %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Island = Island ,
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TUSVI_ABUNDANCE_SV <- TUSVI_TAMSV  %>% # Mean of damselfish abundance along each site per year and Island
+  group_by(Island, SampleYear)  %>% 
+  summarise(
+    Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TUSVIABUNDANCE_SV_LPLOT <- ggplot(TUSVI_ABUNDANCE_SV, aes(x = SampleYear , y = Abundance_Mean, group= Island, color = Island)) +
+  geom_line() +
+  scale_color_manual(values = c(
+    "STT" = "coral",
+    "STJ"   = "green2",
+    "STX"  = "cyan2")) +
+  scale_x_continuous(breaks = seq(min(TUSVI_ABUNDANCE_SV$SampleYear), max(TUSVI_ABUNDANCE_SV$SampleYear), by = 1)) +
+  labs(title = "Average Stegates variabilis Abundance at TCRMP Sites in the USVI from 2013-2025") +
+  labs(x= "Year", y= "Stegates variabilis Mean Abundance") +
+  labs(caption = "Figure No. ?. Average Stegates variabilis abundance at TCRMP sites from 2013-2025. These sites are located on St. Thomas (STT), St. Croix (STX), and St. John (STJ).") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+print(TUSVIABUNDANCE_SV_LPLOT)
+
+################### ST. THOMAS ###########################
+
+
+TSTT_ASV <- dplyr::filter(TABUND_SV, #Only including St. Thomas sites
+                         Island %in% c(
+                           "STT"
+                         ))
+
+TSTT_TAMSV <- TSTT_ASV %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TSTT_ABUNDANCE_SV <- TSTT_TAMSV  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
+  summarise(
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TSTT_ABUNDANCE_SV_LPLOT <- ggplot(TSTT_ABUNDANCE_SV, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) +
+  geom_line() +
+  scale_x_continuous(breaks = seq(min(TSTT_ABUNDANCE_SV$SampleYear), max(TSTT_ABUNDANCE_SV$SampleYear), by = 1)) +
+  labs(title = "Stegates Variabilis Abundance at TCRMP Sites on St. Thomas") +
+  labs(x= "Year", y= "Stegates variabilis Mean Abundance") +
+  labs(caption = "Figure No. ?. Average Stegates variabilis Abundance at TCRMP Sites on St. Thomas") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+############################# ST. CROIX ##################################
+
+TSTX_ASV <- dplyr::filter(TABUND_SV, #Only including St. Thomas sites
+                        Island %in% c(
+                          "STX"
+                        ))
+
+TSTX_TAMSV <- TSTX_ASV %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TSTX_ABUNDANCE_SV <- TSTX_TAMSV  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
+  summarise(
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TSTX_ABUNDANCE_SV_LPLOT <- ggplot(TSTX_ABUNDANCE_SV, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) + 
+  geom_line() +
+  scale_x_continuous(breaks = seq(min(TSTX_ABUNDANCE_SV$SampleYear), max(TSTX_ABUNDANCE_SV$SampleYear), by = 1)) +
+  labs(title = "Stegates Variabilis Abundance at TCRMP Sites on St. Croix") +
+  labs(x= "Year", y= "Stegates variabilis Mean Abundance") + 
+  labs(caption = "Figure No. ?. Average Stegates variabilis Abundance at TCRMP Sites on St. Croix") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+##################### ST. JOHN ##################################
+
+TSTJ_TAMSV <- dplyr::filter(TABUND_SV, #Only including St. Thomas sites
+                           Island %in% c(
+                             "STJ"
+                           ))
+
+TSTJ_TAMSV <- TSTJ_TAMSV %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TSTJ_ABUNDANCE_SV <- TSTJ_TAMSV  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
+  summarise(
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TSTJ_ABUNDANCE_SV_LPLOT <- ggplot(TSTJ_ABUNDANCE_SV, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) + 
+  geom_line() +
+  scale_x_continuous(breaks = seq(min(TSTJ_ABUNDANCE_SV$SampleYear), max(TSTJ_ABUNDANCE_SV$SampleYear), by = 1)) +
+  labs(title = "Stegates Variabilis Abundance at TCRMP Sites on St. John") +
+  labs(x= "Year", y= "Stegates variabilis Mean Abundance") + 
+  labs(caption = "Figure No. ?. Average Stegates variabilis Abundance at TCRMP Sites on St. John") +
+  theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+############################################################################################################################################################################################################################################################# STATS TIME #######################################
+
+# Is there a significance difference of SA abundance across the islands in the USVI?
+
+### ASUMPTIONS 
+
+#1.) Homoscedasticity
+#bartlett.test(Abundance_Mean ~ Island, data = TUSVI_ABUNDANCE_SV) 
+#p-value = 5.303e-06, I reject the hypothesis. This dataset DOES NOT HAVE homogenity of variances
+
+TUSVI_ABUNDANCE_SV$Abundance_Log <- log(TUSVI_ABUNDANCE_SV$Abundance_Mean) # log it 
+#bartlett.test(Abundance_Log ~ Island, data = TUSVI_ABUNDANCE_SV) 
+#p-value = 0.3927, I reject to fail the hypothesis, the log version has homogenity of variances
+
+#hist(TUSVI_ABUNDANCE_SV$Abundance_Log)
+#it decently normal
+
+#2.) Normality
+#shapiro.test(TUSVI_ABUNDANCE_SV$Abundance_Log)
+#p-value = 0.1343 I fail to reject the hypothesis!!
+
+TUSVI_ASV_ANOVA <- aov(Abundance_Log ~ Island, data = TUSVI_ABUNDANCE_SV)
+#summary(TUSVI_ASV_ANOVA)
+#            Df Sum Sq Mean Sq F value   Pr(>F)    
+#Island       2  24.83  12.413   9.725 0.000457 ***
+#Residuals   34  43.40   1.276     
+# significance difference of SV abundance across the islands in the USVI
+
+################### POST HOC ###################
+
+TUK_TUSVI_ASV_ANOVA <- TukeyHSD(TUSVI_ASV_ANOVA)
+
+TUSVI_Island_ANOVA<- emmeans(TUSVI_ASV_ANOVA, ~ Island)
+
+TUSVI_ISLAND_POSTHOC <- cld(TUSVI_Island_ANOVA, Letter = letters)
+
+TUSVI_ISLAND_POSTHOC$.group <- trimws(TUSVI_ISLAND_POSTHOC$.group)
+
+TUSVI_ISLAND_POSTHOC$Post_Hoc <- min(TUSVI_ASV_ANOVA$Abundance_Log, na.rm = TRUE) * 1.1
+
+TUSVI_ASV_BPLOT <- ggplot(TUSVI_ASV_ANOVA, aes(x = Island , y = Abundance_Log , fill = Island)) +
+  geom_boxplot() +
+  geom_text(data = TUSVI_ISLAND_POSTHOC,
+            aes(x = Island,
+                y = Post_Hoc,
+                label = .group),
+            vjust = 2.1 ,
+            inherit.aes = FALSE,
+            size = 6) +
+  scale_y_continuous(limits = c(-2.5, 5)) +
+  scale_fill_manual(values = c(
+    "STT" = "coral",
+    "STJ"   = "green2",
+    "STX"  = "cyan2")) +
+  labs(title = "Stegates variabilis Mean Abundance Across TCRMP Sites From 2013-2025") +
+  labs(caption = "Stegates variabilis Mean Abundance on St. Thomas(STT) , St. Croix(STX), and St. John(STJ).") +
+  labs(x = "Island" , y = "Stegates variabilis Mean Abundance log(Abundance)") +
+  theme_minimal() +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+No analysis on species abundance on TCRMP sites have been conducted. Data does not meet assumptions. 
+
+::: panel-tabset
+## St. Thomas
+
+```{r}
+print(TSTT_ABUNDANCE_SV_LPLOT)
+```
+
+## St. John
+
+```{r}
+print(TSTJ_ABUNDANCE_SV_LPLOT) # St. John plot
+```
+
+## St. Croix
+
+```{r}
+print(TSTX_ABUNDANCE_SV_LPLOT) # St. Croix plot
+```
+:::
+
+
+### Stegates Leucostictus (Beaugregory Damselfish)
+
+![Figure No. ?. An example of an Adult Stegates leucostictus](PHOTOS/FISH/BEAUGREGORY_DAMSELFISH.JPG)
+
+```{r}
+TABUND_SL <- dplyr::filter(CLEAN_TCRMP_FISH, 
+                           ScientificName %in% c(
+                          "Stegastes leucostictus"))
+
+####################################################################################################################################################################  STEGATES LEUCOSTICTUS ACROSS USVI ##############################
+
+TUSVI_TAMSL <- TABUND_SL %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Island = Island ,
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TUSVI_ABUNDANCE_SL <- TUSVI_TAMSL  %>% # Mean of damselfish abundance along each site per year and Island
+  group_by(Island, SampleYear)  %>% 
+  summarise(
+    Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TUSVI_ABUNDANCE_SL_LPLOT <- ggplot(TUSVI_ABUNDANCE_SL, aes(x = SampleYear , y = Abundance_Mean, group= Island, color = Island)) +
+  geom_line() +
+  scale_color_manual(values = c(
+    "STT" = "coral",
+    "STJ"   = "green2",
+    "STX"  = "cyan2")) +
+  scale_x_continuous(breaks = seq(min(TUSVI_ABUNDANCE_SL$SampleYear), max(TUSVI_ABUNDANCE_SL$SampleYear), by = 1)) +
+  labs(title = "Average Stegates leucostictus Abundance at TCRMP Sites in the USVI from 2013-2025") +
+  labs(x= "Year", y= "Stegates leucostictus Mean Abundance") +
+  labs(caption = "Figure No. ?. Average Stegates Leucostictus abundance at TCRMP sites from 2013-2025. These sites are located on St. Thomas (STT), St. Croix (STX), and St. John (STJ).") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+
+#######################################################################################################################################################################  STEGATES LEUCOSTICTUS BY ISLAND ###########################
+
+############# ST. THOMAS ###############################
+
+TSTT_ASL <- dplyr::filter(TABUND_SL, #Only including St. Thomas sites
+                         Island %in% c(
+                           "STT"
+                         ))
+
+TSTT_TAMSL <- TSTT_ASL %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TSTT_ABUNDANCE_SL <- TSTT_TAMSL  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
+  summarise(
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TSTT_ABUNDANCE_SL_LPLOT <- ggplot(TSTT_ABUNDANCE_SL, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) +
+  geom_line() +
+  scale_x_continuous(breaks = seq(min(TSTT_ABUNDANCE_SL$SampleYear), max(TSTT_ABUNDANCE_SL$SampleYear), by = 1)) +
+  labs(title = " Average Stegates leucostictus Abundance on St. Thomas from 2013-2025") +
+  labs(x= "Year", y= "Stegates leucostictus Mean Abundance") +
+  labs(caption = "Figure No. ?. Average Stegates leucostictus Abundance at TCRMP sites on St. Thomas from 2013-2025") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+####################### ST. CROIX ############################
+
+TSTX_ASL <- dplyr::filter(TABUND_SL, #Only including St. Thomas sites
+                        Island %in% c(
+                          "STX"
+                        ))
+
+STTX_TAMSL <- TSTX_ASL %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TSTX_ABUNDANCE_SL <- STTX_TAMSL  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
+  summarise(
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TSTX_ABUNDANCE_SL_LPLOT <- ggplot(TSTX_ABUNDANCE_SL, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) + 
+  geom_line() +
+  scale_x_continuous(breaks = seq(min(TSTX_ABUNDANCE_SL$SampleYear), max(TSTX_ABUNDANCE_SL$SampleYear), by = 1)) +
+  labs(title = " Average Stegates Leucostictus Abundance on St. Croix from 2013-2025") +
+  labs(x = "Year", y = "Stegates leucostictus Mean Abundance") +
+  labs(caption = "Figure No. ?. Average Stegates leucostictus Abundance at TCRMP sites on St. Croix from 2013-2025") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+################ ST.JOHN ###########################
+
+TSTJ_ASL <- dplyr::filter(TABUND_SL, #Only including St. John sites
+                           Island %in% c(
+                             "STJ"))
+
+TSTJ_TAMSL <- TSTJ_ASL %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TSTJ_ABUNDANCE_SL <- TSTJ_TAMSL  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
+  summarise(
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TSTJ_ABUNDANCE_SL_LPLOT <- ggplot(TSTJ_ABUNDANCE_SL, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) + 
+  geom_line() +
+  scale_x_continuous(breaks = seq(min(TSTJ_ABUNDANCE_SL$SampleYear), max(TSTJ_ABUNDANCE_SL$SampleYear), by = 1)) +
+  labs(title = " Average Stegates Leucostictus Abundance on St. John from 2013-2025") +
+  labs(x= "Year", y= "Stegates leucostictus Mean Abundance") +
+  labs(caption = "Figure No. ?. Average Stegates leucostictus Abundance at TCRMP sites on St. John from 2013-2025") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+```
+No analysis on species abundance on TCRMP sites have been conducted. Data does not meet assumptions. 
+
+::: panel-tabset
+## St. Thomas
+
+```{r}
+print(TSTT_ABUNDANCE_SL_LPLOT)
+```
+
+## St. John
+
+```{r}
+print(TSTJ_ABUNDANCE_SL_LPLOT) # St. John plot
+```
+
+## St. Croix
+
+```{r}
+print(TSTX_ABUNDANCE_SL_LPLOT) # St. Croix plot
+```
+:::
+
+### Stegates Adustus (Dusky Damselfish)
+
+![Figure No. ?. An example of an Adult Stegates adustus](PHOTOS/FISH/DUSKY_DAMSELFISH.JPG)
+
+```{r}
+TABUND_SA <- dplyr::filter(CLEAN_TCRMP_FISH, ScientificName %in% c(
+  "Stegastes adustus")) # filtering dusky species ONLY
+
+#######################################################################################################################################################################  STEGATES ADUSTUS ACROSS USVI ###############################
+
+TUSVI_TAMSA <- TABUND_SA %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Island = Island ,
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TUSVI_ABUNDANCE_SA <- TUSVI_TAMSA  %>% # Mean of damselfish abundance along each site per year and Island
+  group_by(Island, SampleYear)  %>% 
+  summarise(
+    Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TUSVIABUNDANCE_SA_LPLOT <- ggplot(TUSVI_ABUNDANCE_SA, aes(x = SampleYear , y = Abundance_Mean, group= Island, color = Island)) +
+  geom_line() +
+  scale_color_manual(values = c(
+    "STT" = "coral",
+    "STJ"   = "green2",
+    "STX"  = "cyan2")) +
+  scale_x_continuous(breaks = seq(min(TUSVI_ABUNDANCE_SA$SampleYear), max(TUSVI_ABUNDANCE_SA$SampleYear), by = 1)) +
+  labs(title = "Average Stegates adustus Abundance at TCRMP Sites in the USVI from 2013-2025") +
+  labs(x= "Year", y= "Stegates plMean Abundance") +
+  labs(caption = "Figure No. ?. Average stegates adustus abundance at TCRMP sites from 2013-2025. These sites are located on St. Thomas (STT), St. Croix (STX), and St. John (STJ).") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+################################################################################################################################################################## STEGATES ADUSTUS ABUNDANCE BY ISLAND ############################
+
+################### ST. THOMAS ##################################
+
+TSTT_ASA <- dplyr::filter(TABUND_SA, #Only including St. Thomas sites
+                         Island %in% c(
+                           "STT"
+                         ))
+
+TSTT_TAMSA <- TSTT_ASA %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TSTT_ABUNDANCE_SA <- TSTT_TAMSA  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
+  summarise(
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TSTT_ABUNDANCE_SA_LPLOT <- ggplot(TSTT_ABUNDANCE_SA, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) +
+  geom_line() +
+  scale_x_continuous(breaks = seq(min(TSTT_ABUNDANCE_SA$SampleYear), max(TSTT_ABUNDANCE_SA$SampleYear), by = 1)) +
+  labs(title = "Average Stegates adustus Abundance at TCRMP Sites on St. Thomas from 2013-2025") +
+  labs(x= "Year", y= "Mean Abundance") +
+  labs(caption = "Figure No. ?. Average Stegates adustus Abundance at TCRMP Sites on St. Thomas from 2013-2025") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+##################### St. Croix #####################
+
+TSTX_ASA <- dplyr::filter(TABUND_SA, #Only including St. Thomas sites
+                        Island %in% c(
+                          "STX"
+                        ))
+
+TSTX_TAMA <- TSTX_ASA %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TSTX_ABUNDANCE_SA <- TSTX_TAMA  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
+  summarise(
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TSTX_ABUNDANCE_SA_LPLOT <- ggplot(TSTX_ABUNDANCE_SA, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) + 
+  geom_line() +
+  scale_x_continuous(breaks = seq(min(TSTX_ABUNDANCE_SA$SampleYear), max(TSTX_ABUNDANCE_SA$SampleYear), by = 1)) +
+  labs(title = "Average Stegates adustus Abundance at TCRMP Sites on St. Croix from 2013-2025") +
+  labs(x= "Year", y= "Stegates adustus Mean Abundance") +
+  labs(caption = "Figure No. ?. Average Stegates adustus Abundance at TCRMP Sites on St. Croix from 2013-2025") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+############## St. John #################################
+
+TSTJ_ASA <- dplyr::filter(TABUND_SA, #Only including St. Thomas sites
+                        Island %in% c(
+                          "STJ"
+                        ))
+
+
+TSTJ_TAMA <- TSTJ_ASA %>% # mean of damselfish abundance along each transect by year and location
+  group_by(Location, Transect, SampleYear) %>% 
+  summarise(
+    Mean_Abundance  = mean(SppTotal) ,
+    .groups = "drop") %>% 
+  unique()
+
+TSTJ_ABUNDANCE_SA <- TSTJ_TAMA  %>% # Mean of damselfish abundance along each site per year and location
+  group_by(Location, SampleYear)  %>% 
+  summarise(
+    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+  )
+
+TSTJ_ABUNDANCE_SA_LPLOT <- ggplot(TSTJ_ABUNDANCE_SA, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) + 
+  geom_line() +
+  scale_x_continuous(breaks = seq(min(TSTJ_ABUNDANCE_SA$ SampleYear), max(TSTJ_ABUNDANCE_SA$ SampleYear), by = 1)) +
+  labs(title = "Average Stegates adustus Abundance at TCRMP Sites on St. John from 2013-2025") +
+  labs(x= "Year", y= "Stegates adustus Mean Abundance") +
+  labs(caption = "Figure No. ?. Average Stegates adustus Abundance at TCRMP Sites on St. John from 2013-2025") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+print(TSTJ_ABUNDANCE_SA_LPLOT)
+
+############################################################################################################################################################################################################################################################### STATS TIME #######################################
+
+# Is there a significance difference of SA abundance across the islands in the USVI?
+
+### ASUMPTIONS 
+
+#1.) Homoscedasticity
+#bartlett.test(Abundance_Log ~ Island, data = TUSVI_ABUNDANCE_SA) 
+
+# p-value = 6.765e-06, I reject the hypothesis. This dataset DOES NOT HAVE homogenity of variances
+
+TUSVI_ABUNDANCE_SA$Abundance_Log <- log(TUSVI_ABUNDANCE_SA$Abundance_Mean) # log it 
+#p-value = 0.4257, I reject to fail the hypothesis, the log version has homogenity of variances
+
+#hist(TUSVI_ABUNDANCE_SA$Abundance_Log)
+#it looks left skewed
+
+#2.) Normality
+#shapiro.test(TUSVI_ABUNDANCE_SA$Abundance_Log)
+# p-value = 0.01099 , DOES NOT PASS, USE CAUTION
+
+TUSVI_ASA_ANOVA <- aov(Abundance_Log ~ Island, data = TUSVI_ABUNDANCE_SA)
+#summary(TUSVI_ASA_ANOVA)
+#            Df Sum Sq Mean Sq F value   Pr(>F)    
+#Island       2 23.496  11.748   79.53 6.17e-14 ***
+#Residuals   36  5.318   0.148   
+
+# yes there is a significance difference of SA abundance across the islands in the USVI
+
+################### POST HOC ###################
+
+TUK_TUSVI_ASA_ANOVA <- TukeyHSD(TUSVI_ASA_ANOVA)
+
+TUSVI_Island_ANOVA<- emmeans(TUSVI_ASA_ANOVA, ~ Island)
+
+TUSVI_ISLAND_POSTHOC <- cld(TUSVI_Island_ANOVA, Letter = letters)
+
+TUSVI_ISLAND_POSTHOC$.group <- trimws(TUSVI_ISLAND_POSTHOC$.group)
+
+TUSVI_ISLAND_POSTHOC$Post_Hoc <- min(TUSVI_ASA_ANOVA$Abundance_Log, na.rm = TRUE) * 1.1
+
+TUSVI_ASA_BPLOT <- ggplot(TUSVI_ASA_ANOVA, aes(x = Island , y = Abundance_Log , fill = Island)) +
+  geom_boxplot() +
+  geom_text(data = TUSVI_ISLAND_POSTHOC,
+            aes(x = Island,
+                y = Post_Hoc,
+                label = .group),
+            vjust = 2.1 ,
+            inherit.aes = FALSE,
+            size = 6) +
+  scale_fill_manual(values = c(
+    "STT" = "coral",
+    "STJ"   = "green2",
+    "STX"  = "cyan2")) +
+  labs(title = "Stegates adustus Mean Abundance Across TCRMP Sites From 2013-2025") +
+  labs(caption = "Stegates adustus Mean Abundance on St. Thomas, St. Croix, and St. John. This data did not pass the Shapiro-Wilks test.") +
+  labs(x = "Island" , y = "Stegates adustus Mean Abundance log(Abundance)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+## all these diddly darn fish have significantly different abundances across the USVI  
 ```
 
 ::: panel-tabset
 ## St. Thomas
 
 ```{r}
-print(STT_ABUNDANCE_PLOT) # St. Thomas Damselfish Abundance 2013-2022 
+print(TSTT_ABUNDANCE_SA_LPLOT)
 ```
 
 ## St. John
 
 ```{r}
-print(STJ_ABUNDANCE_PLOT) # St. John Damselfish Abundance 2013-2022
+print(TSTJ_ABUNDANCE_SA_LPLOT) # St. John plot
 ```
 
 ## St. Croix
 
 ```{r}
-print(STX_ABUNDANCE_PLOT) # St. Croix Damselfish Abundance 2013-2022
+print(TSTX_ABUNDANCE_SA_LPLOT) # St. Croix plot
 ```
 :::
+
+
+## Coral Distrubution
+
+![Figure No. 1.1. The Average Damselfish-Coral interaction from 2013-2025](PHOTOS/MAPS/MEAN_CORAL_COVER.JPG)
+
+The US Virgin Islands is apart of the larger Caribbean hosting (REAL)% of coral populations across the world. Coral cover has been on an active decline and die-offs from keystones species led to altering species composition.
+
+The goal is to: look at coral cover differences from 2013-2025 damselfish-coral interaction hot-spots damselfish-coral host interactions coral disease areas coral bleaching areas
 
 ```{r}
 TCRMP_SITE <- read.csv("C:/Users/Owner/OneDrive/Documents/GOODMAN_THESIS/TCRMP_datasets/TCRMP_Site_Metadata.xls - SiteMetadata.csv") %>% 
@@ -386,633 +1419,6 @@ print(CORALSP) # Damselfish presence on different coral species
 print(COR_PERC_GRAPH) # percentage of damselfish species interacting with coral
 ```
 :::
-
-## Damselfish Distrubution By Species
-
-There are six damselfish species native to the Caribbean. These fish are small \<10cm, with spikey dorsal fin. Damselfishes are detrivores, omnivores, and primarily herbivores.
-
-5/6 damselfish species are considered "farmerfish". They create algal farms within their 1m\^2 territories by propgating algae and attaching it to corals or hard substrate. They guard these algal gardens and some species () domesticate shrimp to cultivate their farms.
-
-Damselfish are considered solitary fish with aggressive behaviors. They are seen attacking and chasing other marine animals when they feel threatened or if the animal is too close to their algal gardens.
-
-### Stegates Planifrons (Threespot Damselfish)
-
-![Figure No. 4. An example of an Adult Stegates planifrons.](PHOTOS/DAMSELFISH_EXAMPLE.JPG)
-
-Stegates planifrons are Adults have brownish-black body with a yellow-gray underbelly and juveniles are fully yellow. and notably more aggressive than other species of damselfish. T
-
-```{r}
-TCRMP_FISH_RAW <- read.csv("TCRMP_datasets/TCRMP_FISH/AUG2022/TCRMP_Master_Fish_Census_Aug2022.xlsx - FishData.csv") # load TCRMP data
-
-CLEAN_TCRMP_FISH <- subset(TCRMP_FISH_RAW, select = -c(Month, SampleYear , Period, CommonName, X0.5, X6.10, X11.20, X21.30, X31.40, X41.50, X51.60, X61.70, X71.80, X81.90, X91.100)) %>% # removing excess columns 
-  mutate(Location = toupper(Location)) %>% #making all site names the same 
-  dplyr::filter(!dplyr::between(as.numeric (Year), 2003, 2012)) #filter data to 2013-2021 %>%
-
-
-ABUND_SP <- dplyr::filter(CLEAN_TCRMP_FISH, Metric!= "Biomass" , # removing rows (biomass)
-                          ScientificName %in% c(
-                            "Stegastes planifrons"
-                          ))
-################# ST. THOMAS ########################################
-STT_ASP <- dplyr::filter(ABUND_SP, #Only including St. Thomas sites
-                         Location %in% c(
-                           "BLACK POINT",
-                           "BREWERS BAY",
-                           "FLAT CAY",
-                           "BUCK ISLAND STT",
-                           "SOUTH WATER",
-                           "SOUTH CAPELLA",
-                           "SEAHORSE COTTAGE SHOAL",
-                           "ST JAMES",
-                           "COCULUS ROCK",
-                           "MAGENS BAY",
-                           "BOTANY BAY",
-                           "SAVANA",
-                           "GRAMMANIK TIGER FSA",
-                           "COLLEGE SHOAL EAST",
-                           "GINGSBURG FRINGE"
-                         ))
-
-STT_TAMSP <- STT_ASP %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
-  summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
-    .groups = "drop") %>% 
-  unique()
-
-STT_ABUNDANCE_TSPOT <- STT_TAMSP  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
-  summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
-  )
-
-STT_ABUNDANCE_TSPOT_PLOT <- ggplot(STT_ABUNDANCE_TSPOT, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) + # St. Thomas plot of Stegates planiforns from 2013-2022
-  geom_line() +
-  scale_x_continuous(breaks = seq(min(STT_ABUNDANCE_TSPOT$Year), max(STT_ABUNDANCE_TSPOT$Year), by = 1)) +
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-################# ST. Croix ############################
-
-SX_ASP <- dplyr::filter(ABUND_SP, #Only including St. Croix sites
-                        Location %in% c(
-                          "BUCK ISLAND STX",
-                          "BUCK ISLAND STX DEEP",
-                          "LANG BANK EEMP",
-                          "HIND BANK EAST FSA",
-                          "JACKS BAY",
-                          "CASTLE",
-                          "GREAT POND",
-                          "LANG BANK RED HIND FSA",
-                          "MUTTON SNAPPER FSA",
-                          "KINGS CORNER",
-                          "CANE BAY",
-                          "SALT RIVER",
-                          "EAGLE RAY"
-                        ))
-
-STX_TAMTSPOT <- SX_ASP %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
-  summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
-    .groups = "drop") %>% 
-  unique()
-
-STX_ABUNDANCE_TSPOT <- STX_TAMTSPOT  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
-  summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
-  )
-
-STX_ABUNDANCE_TSPOT_PLOT <- ggplot(STX_ABUNDANCE_TSPOT, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) + # St. Croix plot of Stegates planifrons from 2013-2022
-  geom_line() +
-  scale_x_continuous(breaks = seq(min(STX_ABUNDANCE_TSPOT$Year), max(STX_ABUNDANCE_TSPOT$Year), by = 1)) +
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-############# ST. JOHN ################################
-
-SJ_ADAMSP <- dplyr::filter(ABUND_SP, #Only including St. John sites
-                           Location %in% c(
-                             "MERI SHOAL",
-                             "FISH BAY",
-                             "CORAL BAY"
-                           ))
-
-
-STJ_TAMSP <- SJ_ADAMSP %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
-  summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
-    .groups = "drop") %>% 
-  unique()
-
-STJ_ABUNDANCE_TSPOT <- STJ_TAMSP  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
-  summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
-  )
-
-STJ_ABUNDANCE_TSPOT_PLOT <- ggplot(STJ_ABUNDANCE_TSPOT, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) + # Plot of St. John sites and damselfish abundance
-  geom_line() +
-  scale_x_continuous(breaks = seq(min(STJ_ABUNDANCE_TSPOT$Year), max(STJ_ABUNDANCE_TSPOT$Year), by = 1)) +
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-```
-
-::: panel-tabset
-## St. Thomas
-
-```{r}
-print(STT_ABUNDANCE_TSPOT_PLOT) # St. Thomas plot 
-```
-
-## St. John
-
-```{r}
-print(STJ_ABUNDANCE_TSPOT_PLOT) # St. John plot
-```
-
-## St. Croix
-
-```{r}
-print(STX_ABUNDANCE_TSPOT_PLOT) # St. Croix plot
-```
-:::
-
-### Stegates Variabilis (Cocoa Damselfish)
-
-(LILA INSERT A DAMN IMAGE WHEN YOU GOT WIFI)
-
-```{r}
-ABUND_SV <- dplyr::filter(CLEAN_TCRMP_FISH, Metric!= "Biomass" , # removing rows (biomass)
-                          ScientificName %in% c(
-                            "Stegastes variabilis"
-                          ))
-
-STT_ASV <- dplyr::filter(ABUND_SV, #Only including St. Thomas sites
-                         Location %in% c(
-                           "BLACK POINT",
-                           "BREWERS BAY",
-                           "FLAT CAY",
-                           "BUCK ISLAND STT",
-                           "SOUTH WATER",
-                           "SOUTH CAPELLA",
-                           "SEAHORSE COTTAGE SHOAL",
-                           "ST JAMES",
-                           "COCULUS ROCK",
-                           "MAGENS BAY",
-                           "BOTANY BAY",
-                           "SAVANA",
-                           "GRAMMANIK TIGER FSA",
-                           "COLLEGE SHOAL EAST",
-                           "GINGSBURG FRINGE"
-                         ))
-
-STT_TAMCOCOA <- STT_ASV %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
-  summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
-    .groups = "drop") %>% 
-  unique()
-
-STT_ABUNDANCE_COCOA <- STT_TAMCOCOA  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
-  summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
-  )
-
-STT_ABUNDANCE_COCOA_PLOT <- ggplot(STT_ABUNDANCE_COCOA, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) +
-  geom_line() +
-  scale_x_continuous(breaks = seq(min(STT_ABUNDANCE_COCOA$Year), max(STT_ABUNDANCE_COCOA$Year), by = 1)) +
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-############################# ST. CROIX ##################################
-
-SX_ASV <- dplyr::filter(ABUND_SV, #Only including St. Thomas sites
-                        Location %in% c(
-                          "BUCK ISLAND STX",
-                          "BUCK ISLAND STX DEEP",
-                          "LANG BANK EEMP",
-                          "HIND BANK EAST FSA",
-                          "JACKS BAY",
-                          "CASTLE",
-                          "GREAT POND",
-                          "LANG BANK RED HIND FSA",
-                          "MUTTON SNAPPER FSA",
-                          "KINGS CORNER",
-                          "CANE BAY",
-                          "SALT RIVER",
-                          "EAGLE RAY"
-                        ))
-
-STX_TAMCOCOA <- SX_ASV %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
-  summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
-    .groups = "drop") %>% 
-  unique()
-
-STX_ABUNDANCE_COCOA <- STX_TAMCOCOA  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
-  summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
-  )
-
-STX_ABUNDANCE_COCOA_PLOT <- ggplot(STX_ABUNDANCE_COCOA, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) + 
-  geom_line() +
-  scale_x_continuous(breaks = seq(min(STX_ABUNDANCE_COCOA$Year), max(STX_ABUNDANCE_COCOA$Year), by = 1)) +
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-
-##################### ST. JOHN ##################################
-
-SJ_ADAMCOCOA <- dplyr::filter(ABUND_SV, #Only including St. Thomas sites
-                           Location %in% c(
-                             "MERI SHOAL",
-                             "FISH BAY",
-                             "CORAL BAY"
-                           ))
-
-
-STJ_TAMCOCOA <- SJ_ADAMCOCOA %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
-  summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
-    .groups = "drop") %>% 
-  unique()
-
-STJ_ABUNDANCE_COCOA <- STJ_TAMCOCOA  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
-  summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
-  )
-
-STJ_ABUNDANCE_COCOA_PLOT <- ggplot(STJ_ABUNDANCE_COCOA, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) + 
-  geom_line() +
-  scale_x_continuous(breaks = seq(min(STJ_ABUNDANCE_COCOA$Year), max(STJ_ABUNDANCE_COCOA$Year), by = 1)) +
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-```
-
-::: panel-tabset
-## St. Thomas
-
-```{r}
-print(STT_ABUNDANCE_COCOA_PLOT) # St. Thomas Plot
-```
-
-## St. John
-
-```{r}
-print(STJ_ABUNDANCE_COCOA_PLOT) # St. John plot
-```
-
-## St. Croix
-
-```{r}
-print(STX_ABUNDANCE_COCOA_PLOT) # St. Croix Plot 
-```
-:::
-
-### Stegates Leucostictus (Beaugregory Damselfish)
-
-(LILA INSERT A DAMN IMAGE WHEN YOU GOT WIFI)
-
-```{r}
-ABUND_SL <- dplyr::filter(CLEAN_TCRMP_FISH, Metric!= "Biomass" , # removing rows (biomass)
-                              ScientificName %in% c(
-                                "Stegastes leucostictus"
-                              ))
-
-STT_ASL <- dplyr::filter(ABUND_SL, #Only including St. Thomas sites
-                         Location %in% c(
-                           "BLACK POINT",
-                           "BREWERS BAY",
-                           "FLAT CAY",
-                           "BUCK ISLAND STT",
-                           "SOUTH WATER",
-                           "SOUTH CAPELLA",
-                           "SEAHORSE COTTAGE SHOAL",
-                           "ST JAMES",
-                           "COCULUS ROCK",
-                           "MAGENS BAY",
-                           "BOTANY BAY",
-                           "SAVANA",
-                           "GRAMMANIK TIGER FSA",
-                           "COLLEGE SHOAL EAST",
-                           "GINGSBURG FRINGE"
-                         ))
-
-STT_TAMSL <- STT_ASL %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
-  summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
-    .groups = "drop") %>% 
-  unique()
-
-STT_ABUNDANCE_BEAU <- STT_TAMSL  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
-  summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
-  )
-
-STT_ABUNDANCE_BEAU_PLOT <- ggplot(STT_ABUNDANCE_BEAU, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) +
-  geom_line() +
-  scale_x_continuous(breaks = seq(min(STT_ABUNDANCE_BEAU$Year), max(STT_ABUNDANCE_BEAU$Year), by = 1)) +
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-
-################## ST. CROIX #########################
-
-SX_ASL <- dplyr::filter(ABUND_SL, #Only including St. Thomas sites
-                        Location %in% c(
-                          "BUCK ISLAND STX",
-                          "BUCK ISLAND STX DEEP",
-                          "LANG BANK EEMP",
-                          "HIND BANK EAST FSA",
-                          "JACKS BAY",
-                          "CASTLE",
-                          "GREAT POND",
-                          "LANG BANK RED HIND FSA",
-                          "MUTTON SNAPPER FSA",
-                          "KINGS CORNER",
-                          "CANE BAY",
-                          "SALT RIVER",
-                          "EAGLE RAY"
-                        ))
-
-STX_TAMBEAU <- SX_ASL %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
-  summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
-    .groups = "drop") %>% 
-  unique()
-
-STX_ABUNDANCE_BEAU <- STX_TAMBEAU  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
-  summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
-  )
-
-STX_ABUNDANCE_BEAU_PLOT <- ggplot(STX_ABUNDANCE_BEAU, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) + 
-  geom_line() +
-  scale_x_continuous(breaks = seq(min(STX_ABUNDANCE_BEAU$Year), max(STX_ABUNDANCE_BEAU$Year), by = 1)) +
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-
-################ ST.JOHN ###########################
-
-SJ_ASL <- dplyr::filter(ABUND_SL, #Only including St. John sites
-                           Location %in% c(
-                             "MERI SHOAL",
-                             "FISH BAY",
-                             "CORAL BAY"
-                           ))
-
-
-STJ_TAMSL <- SJ_ASL %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
-  summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
-    .groups = "drop") %>% 
-  unique()
-
-STJ_ABUNDANCE_BEAU <- STJ_TAMSL  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
-  summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
-  )
-
-STJ_ABUNDANCE_BEAU_PLOT <- ggplot(STJ_ABUNDANCE_BEAU, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) + 
-  geom_line() +
-  scale_x_continuous(breaks = seq(min(STJ_ABUNDANCE_BEAU$Year), max(STJ_ABUNDANCE_BEAU$Year), by = 1)) +
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-```
-
-::: panel-tabset
-## St. Thomas
-
-```{r}
-print(STT_ABUNDANCE_BEAU_PLOT) # St. Thomas
-
-```
-
-## St. John
-
-```{r}
-print(STJ_ABUNDANCE_BEAU_PLOT) # St. John
-
-```
-
-## St. Croix
-
-```{r}
-print(STX_ABUNDANCE_BEAU_PLOT) # St. Croix 
-```
-:::
-
-### Stegates Adustus (Dusky Damselfish)
-
-(LILA INSERT A DAMN IMAGE WHEN YOU GOT WIFI)
-
-```{r}
-ABUND_SA <- dplyr::filter(CLEAN_TCRMP_FISH, Metric!= "Biomass" , # removing rows (biomass)
-                              ScientificName %in% c(
-                                "Stegastes adustus"
-                              ))
-
-STT_ASA <- dplyr::filter(ABUND_SA, #Only including St. Thomas sites
-                         Location %in% c(
-                           "BLACK POINT",
-                           "BREWERS BAY",
-                           "FLAT CAY",
-                           "BUCK ISLAND STT",
-                           "SOUTH WATER",
-                           "SOUTH CAPELLA",
-                           "SEAHORSE COTTAGE SHOAL",
-                           "ST JAMES",
-                           "COCULUS ROCK",
-                           "MAGENS BAY",
-                           "BOTANY BAY",
-                           "SAVANA",
-                           "GRAMMANIK TIGER FSA",
-                           "COLLEGE SHOAL EAST",
-                           "GINGSBURG FRINGE"
-                         ))
-
-STT_TAMSA <- STT_ASA %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
-  summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
-    .groups = "drop") %>% 
-  unique()
-
-STT_ABUNDANCE_DUSK <- STT_TAMSA  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
-  summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
-  )
-
-STT_ABUNDANCE_DUSK_PLOT <- ggplot(STT_ABUNDANCE_DUSK, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) +
-  geom_line() +
-  scale_x_continuous(breaks = seq(min(STT_ABUNDANCE_DUSK$Year), max(STT_ABUNDANCE_DUSK$Year), by = 1)) +
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-
-##################### St. Croix #####################
-
-SX_ASA <- dplyr::filter(ABUND_SA, #Only including St. Thomas sites
-                        Location %in% c(
-                          "BUCK ISLAND STX",
-                          "BUCK ISLAND STX DEEP",
-                          "LANG BANK EEMP",
-                          "HIND BANK EAST FSA",
-                          "JACKS BAY",
-                          "CASTLE",
-                          "GREAT POND",
-                          "LANG BANK RED HIND FSA",
-                          "MUTTON SNAPPER FSA",
-                          "KINGS CORNER",
-                          "CANE BAY",
-                          "SALT RIVER",
-                          "EAGLE RAY"
-                        ))
-
-STX_TAMA <- SX_ASA %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
-  summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
-    .groups = "drop") %>% 
-  unique()
-
-STX_ABUNDANCE_DUSK <- STX_TAMA  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
-  summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
-  )
-
-STX_ABUNDANCE_DUSK_PLOT <- ggplot(STX_ABUNDANCE_DUSK, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) + 
-  geom_line() +
-  scale_x_continuous(breaks = seq(min(STX_ABUNDANCE_DUSK$Year), max(STX_ABUNDANCE_DUSK$Year), by = 1)) +
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-############## St. John #################################
-
-SJ_ASA <- dplyr::filter(ABUND_SA, #Only including St. Thomas sites
-                        Location %in% c(
-                          "MERI SHOAL",
-                          "FISH BAY",
-                          "CORAL BAY"
-                        ))
-
-
-STJ_TAMA <- SJ_ASA %>% # mean of damselfish abundance along each transect by year and location
-  group_by(Location, Transect, Year) %>% 
-  summarise(
-    Sum_Abundance= sum(Total),
-    Mean_Abundance  = mean(Total) ,
-    .groups = "drop") %>% 
-  unique()
-
-STJ_ABUNDANCE_DUSK <- STJ_TAMA  %>% # Mean of damselfish abundance along each site per year and location
-  group_by(Location, Year)  %>% 
-  summarise(
-    Location_Abundance_mean = (sum(Mean_Abundance))/10 #10 is the transect per site
-  )
-
-STJ_ABUNDANCE_DUSK_PLOT <- ggplot(STJ_ABUNDANCE_DUSK, aes(x=Year , y = Location_Abundance_mean, group= Location, color = Location)) + 
-  geom_line() +
-  scale_x_continuous(breaks = seq(min(STJ_ABUNDANCE_DUSK$Year), max(STJ_ABUNDANCE_DUSK$Year), by = 1)) +
-  labs(x= "Year", y= "Mean Abundance") +
-  labs(caption = "Figure No. 4. Average Damselfish Abundance Per Year By Location") +
-  theme_minimal() +
-  theme(legend.position = "right") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-```
-
-::: panel-tabset
-## St. Thomas
-
-```{r}
-print(STT_ABUNDANCE_DUSK_PLOT) # St. Thomas plot
-```
-
-## St. John
-
-```{r}
-print(STJ_ABUNDANCE_DUSK_PLOT) # St. John plot
-```
-
-## St. Croix
-
-```{r}
-print(STX_ABUNDANCE_DUSK_PLOT) # St. Croix plot
-```
-:::
-
-## Coral Distrubution
-
-![Figure No. 1.1. The Average Damselfish-Coral interaction from 2013-2025](PHOTOS/MEAN_CORAL_COVER.JPG)
-
-The US Virgin Islands is apart of the larger Caribbean hosting (REAL)% of coral populations across the world. Coral cover has been on an active decline and die-offs from keystones species led to altering species composition.
-
-The goal is to: look at coral cover differences from 2013-2025 damselfish-coral interaction hot-spots damselfish-coral host interactions coral disease areas coral bleaching areas
 
 ![Figure No. ?. The Average Macroalgae Cover From 2013-2025](PHOTOS/DAMSELFISH_CORAL_INTERACTION.jpg)
 
