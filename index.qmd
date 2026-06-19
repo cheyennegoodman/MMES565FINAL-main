@@ -1,8 +1,8 @@
 ---
 title: "MMES565FINAL"
 author: "Cheyenne Leila Goodman"
-
 ---
+
 ---
 title: "Introduction and Research Objectives"
 author: "Cheyenne Leila Goodman"
@@ -12,10 +12,9 @@ author: "Cheyenne Leila Goodman"
 
 ## Introduction
 
-The Caribbean is home to 10% of the global coral cover, yet over 75% of Caribbean corals are considered threatened (UNEP-WCMC et al., 2021; Burke et al., 2011). Both global and local stressors such as disease and thermal stress has caused massive die-offs in corals and other ecologically important species such as *Diadema antillarum *; therefore, causing an increase in macroalgae (Jackson et al., 2014). Figure No. 1 shows a reef building stony coral, *Orbicella annularis* that provides shelter and structure to reef fish. 
+The Caribbean is home to 10% of the global coral cover, yet over 75% of Caribbean corals are considered threatened (UNEP-WCMC et al., 2021; Burke et al., 2011). Both global and local stressors such as disease and thermal stress has caused massive die-offs in corals and other ecologically important species such as *Diadema antillarum* ; therefore, causing an increase in macroalgae (Jackson et al., 2014). Figure No. 1 shows a reef building stony coral, *Orbicella annularis* that provides shelter and structure to reef fish.
 
-![Figure No. 2. A photo of *Orbicella annularis* with tissue lesions caused by fish predation taken by Cheyenne L. Goodman](PHOTOS/PREDATION.JPG)
-Native to the Caribbean, there are eight species of damselfish that range from herbivore and planktivores. These fish have aggressive behavior that causes them to defend their territories and bite coral to create algal gardens for food (Kaufman, 1981). 
+![Figure No. 2. A photo of Orbicella annularis with tissue lesions caused by fish predation taken by Cheyenne L. Goodman](PHOTOS/PREDATION.JPG) Native to the Caribbean, there are eight species of damselfish that range from herbivore and planktivores. These fish have aggressive behavior that causes them to defend their territories and bite coral to create algal gardens for food (Kaufman, 1981).
 
 ## Research Objectives
 
@@ -27,16 +26,15 @@ I aim to answer these questions with my research thesis:
 
 -   How has damselfish presence correlated to coral health, disease, and bleaching recovery within the past 10 years?
 
-## References 
+## References
 
 Burke, L., Reytar, K., Spalding, M. & Perry, A. (2011). Reefs at risk revisited. Washington, DC: World Resources Institute (WRI).
 
 Jackson, J., Donovan, M., Cramer, K., & Lam, V. (2014). Status and trends of Caribbean coral reefs: 1970-2012. Gland, Switzerland: Global Coral Reef Monitoring Network; International Union for the Conservation of Nature (IUCN).
 
-Kaufman, L. (1981). There was Biological Disturbance on Pleistocene Coral Reefs. Paleobiology, 7(4), 527–532. 
+Kaufman, L. (1981). There was Biological Disturbance on Pleistocene Coral Reefs. Paleobiology, 7(4), 527–532.
 
 UNEP-WCMC, WorldFish Centre, WRI, TNC (2021). Global distribution of warm-water coral reefs, compiled from multiple sources including the Millennium Coral Reef Mapping Project. Version 4.1. Includes contributions from IMaRS-USF and IRD (2005), IMaRS-USF (2005) and Spalding et al. (2001). Cambridge (UK): UN Environment World Conservation Monitoring Centre.
-
 
 ## Background
 

@@ -1,0 +1,28 @@
+Sheets,
+SiteMetadata,List of TCRMP sites with identifying information
+SubstrateCodes,List of codes used in the TCRMP algae heights dataset and what they mean
+DataValidation,"List of codes used for validation purposed in the ""HeightsRawData"" tab - do not alter"
+HeightsRawData,Raw algae heights data
+,
+,
+Columns,
+Location,Monitoring location at which data was collected
+SampleDate,Date on which data was collected
+SampleYear,Monitoring period in which data was collected; Note - Sample year may not always match the year from the SampleDate if a location was surveyed late in the annual monitoring period (i.e. data collected in January 2018 could be included in the 2017 annual monitoring period)
+SampleMonth,"Month in which data was collected; Note - when a location was not surveyed fully in the same month, the month in which sampling began is used as the sample month"
+Period,"Refers to the sample period in which the data falls; Periods are as follows: Annual (normal annual TCRMP sampling), PeakBL (secondary TCRMP sampling to capture peak bleaching due to thermal stress), PostBL (secondary sampling as a follow up to thermal stress), SCTLD (extra sampling points taken at a subsample of TCRMP locations to monitor the progression of Stony Coral Tissue Loss Disease), and WS (samples taken at a subset of TCRMP locations [Black Point, Buck Island STT, Coculus Rock, Magens Bay, Botany Bay, Savana, Flat Cay, Seahorse Cottage Shoal] during research cruises aboard the R/V Walton Smith)"
+Recorder,Diver who recorded the data
+Transect,"Transect number; Note - there are typically 6 transects per site, but additional transects may have been recorded"
+Substrate,Indicates the type of algae being measured
+Height,Height in cm of the substrate measured undisturbed perpendicular to the plane of growth
+Notes,Additional notes about the transect or substrate
+,
+,
+Other Notes,
+1,"Algae heights are measured on the same transects as those used for coral health assessments. Transects are 10 m in length and there are typically 6 per site though additional transects may have been recorded. Algae heights are measured every 50 cm along the transect line for a maximum total of 20 measurements. If no algae is present at the designated measurement interval, the interval is skipped"
+2,Peyssonnelia sp (PEY) was added as a substrate category in 2014
+3,Filamentous turf algae with sediment was added as a substrate category in September 2015
+4,"All measurements recorded as ""encrusting Lobophora sp"" (ENLOBO) prior to 2016 were changed to Peyssonnelia sp in January 2016"
+5,Ramicrusta sp (RAMI) was added as a substrate category in 2017
+6,"Prior to 2016, Peyssonnelia sp and CCA heights recorded as 0 or presence/absence were entered as a height of 0.1 cm (minimum measurement)"
+7,"Beginning September 2016, all encrusting forms of macroalgae (CALG, PEY, RAMI) are recorded as presence/absence and entered in the raw data as ""1"" to denote presence"
