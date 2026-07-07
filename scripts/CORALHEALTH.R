@@ -17,22 +17,82 @@ library(MASS)
 # What species of damselfish are interacting with corals? 
 # How many times does damselfish species bitethe coral? 
 
+#### DISCUSSION
+#I am assuming
+
 TCRMP_SITE <- read.csv("TCRMP_datasets/TCRMP_Site_Metadata.xls - SiteMetadata.csv") #MERGING TCRMP SITE WITH CORAL
 
 CORAL_INTERACTION_RAW <- read.csv("TCRMP_datasets/TCRMP_CORAL_HEALTH/DEC2025/TCRMP_coralhealth_interaction_master_May2002_Dec2025_external.csv") ## RAW TCRMP CORAL DATA
 
 #each row describes a specific coral individual (colony_id), coral species, location, sample date, survey year period, method, category of interaction, code for coral interaction, the meaning of the interaction code, and extent of interaction. 
+# each individual coral has a single interaction per row identified by the species presence/absence and/or abundance. If there is another row of the same coral individual (same ID number), it can describe another interaction with the same coral colony (bites from fish, macroalgae, disease ect). 
 
 #I need to separate the data by site, per year. I want to look at different coral species and which ones have more damselfish presence. 
 # I need year, site, transect, species, damselfish pres, and bites
 
-unique(CORAL_INTERACTION_RAW$surveyyear)
+CORAL_INTERACTION_CLEAN <- subset(CORAL_INTERACTION_RAW, select = -c(sampledate, method, period))  %>% #removing unneccessary column s
+  rename(Location = location)   %>% #uppercase for left join with site
+  dplyr::filter(!dplyr::between(as.numeric (as.character(surveyyear)), 2002, 2012)) %>% #filter data to 2013-2025
+  filter(!species %in% c("Tubastraea coccinea",  
+                         "Scolymia lacera", "
+                         Mycetophyllia danaana",
+                         "Porites colonensis",
+                         "Acropora cervicornis",
+                         "Agaricia fragilis",
+                         "Madracis pharensis",
+                         "Mycetophyllia spp.",
+                         "Pseudodiploria clivosa",
+                         "Madracis mirabilis"
+                         )) # removing coral species with one observation for analysis
 
-CORAL_INTERACTION_CLEAN <- subset(CORAL_INTERACTION_RAW, select = -c(sampledate, method, period))  %>% 
-dplyr::filter(!dplyr::between(as.numeric (as.character(surveyyear)), 2002, 2012)) #filter data to 2013-2025
+#########################################################################################################################################################################################
+## Data Visualization of Damselfish-Coral in the USVI
 
-DAMSONLY <- CORAL_INTERACTION_CLEAN  %>% 
-  dplyr::filter(code_meaning %in% c( "Stegastes planifrons: not distinguished between Interaction, Predator, Predation" ,
+# pls dont judge pookies, it took me forever to figure this out or maybe I was too stressed with shipping my damn car and moving. 
+
+TCD_ONLY <- CORAL_INTERACTION_CLEAN  %>% 
+  mutate(Damselfish_ID = ifelse(
+    code_meaning %in% c("Stegastes planifrons: not distinguished between Interaction, Predator, Predation" ,
+                                    "Stegastes adustus: not distinguished between Interaction, Predator, Predation" ,
+                                    "Damselfish spp.: not distinguished between Interaction, Predator, Predation" , 
+                                    "Stegastes leucostictus: not distinguished between Interaction, Predator, Predation",
+                                    "Stegastes diencaeus",
+                                    "Stegastes variabilis",
+                                    "Stegastes partitus",
+                                    "Microspathodon chrysurus",
+                                    "Stegastes adustus",
+                                    "Damselfish spp",
+                                    "Stegastes planifrons",
+                                    "Stegastes leucostictus"),
+    code_meaning,
+    NA
+    )) %>% 
+  mutate(Damselfish_Extent = case_when(
+    Damselfish_ID == "Stegastes planifrons: not distinguished between Interaction, Predator, Predation" ~ extent,
+    Damselfish_ID == "Stegastes adustus: not distinguished between Interaction, Predator, Predation" ~ extent,
+    Damselfish_ID == "Damselfish spp.: not distinguished between Interaction, Predator, Predation"  ~ extent, 
+    Damselfish_ID ==   "Stegastes leucostictus: not distinguished between Interaction, Predator, Predation" ~ extent,
+    Damselfish_ID ==  "Stegastes diencaeus" ~ extent,
+    Damselfish_ID == "Stegastes variabilis" ~ extent,
+    Damselfish_ID ==  "Stegastes partitus" ~ extent,
+    Damselfish_ID ==  "Microspathodon chrysurus" ~ extent,
+    Damselfish_ID ==  "Stegastes adustus" ~ extent,
+    Damselfish_ID ==  "Damselfish spp" ~ extent,
+    Damselfish_ID ==  "Stegastes planifrons" ~ extent,
+    Damselfish_ID ==  "Stegastes leucostictus" ~ extent,
+    TRUE ~ NA )
+  )
+### UGH THERE ARE 0s where it should be ONESSS UGH 
+
+### damselfish density calculation ###
+# d = (M/V)   Mass = Abundance , Volume = 10m transects 
+# convert volume to 100m^-2 to match literature 
+# divide by 6 transects for each site 
+#
+
+
+TCDB_ONLY <- CORAL_INTERACTION_CLEAN  %>% 
+  dplyr::filter(code_meaning %in% c("Stegastes planifrons: not distinguished between Interaction, Predator, Predation" ,
                                  "Stegastes adustus: not distinguished between Interaction, Predator, Predation" ,
                                  "Damselfish spp.: not distinguished between Interaction, Predator, Predation" , 
                                  "Stegastes leucostictus: not distinguished between Interaction, Predator, Predation",
@@ -44,7 +104,27 @@ DAMSONLY <- CORAL_INTERACTION_CLEAN  %>%
                                  "Damselfish spp",
                                  "Stegastes planifrons",
                                  "Stegastes leucostictus"))
+
+TDAMSONLY <- TCDB_ONLY %>% 
+  dplyr::filter(category %in% c(
+    "Damselfish" # removing damselfish predation bites 
+  ))
+
+### damselfish density calculation ###
+# d = (M/V)   Mass = Abundance , Volume = 10m transects 
+# convert volume to 100m^-2 to match literature 
+# divide by 6 transects for each site 
+#
+
+TDDAMS <- TDAMSONLY %>% 
+  group_by(species) %>% 
+  summarise(
+    Density = sum(extent)/ 100 , # fish density to 100m^2
+    Damselfish_Species = code_meaning
+  ) %>% 
+  unique()
   
+ 
 T_USVI_DCI <- ggplot(DAMSONLY, aes(x = species, fill = code_meaning)) + # coral species affected by damselfish bites and what species of damselfish are biting
   geom_bar() +
   labs(title = "Overall Coral-Damselfish Interaction By Species in the USVI") +
@@ -54,30 +134,72 @@ T_USVI_DCI <- ggplot(DAMSONLY, aes(x = species, fill = code_meaning)) + # coral 
 theme_minimal() +
   theme(legend.position = "right") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+## so I dont care anymore about getting anymore data visualization from this fuckass dataset 
+############ STATS ############################
+# GOALS :
+# I want to look at coral species with the most damselfish interactions
+# I want to look at the damselfish with the most coral interaction
+# which damselfih species has more biting prevalance amougst coral
+# Is there an interactive interaction with diseased/ bleached coral and damselfish prevalance? 
+
+############################################################################### ASSUMPTIONS
+
+#FUCK ASS DATASET 
+
+# 1. Homoscedascity 
+bartlett.test(extent ~ species, data = TDAMSONLY)
+
+TUSVI_ADAM_ANOVA <- aov(Abundance_Log ~ Site, data = TUSVI_ABUNDANCE)
+summary(TUSVI_ADAM_ANOVA)
+
+# Normality
+shapiro.test(TUSVI_ABUNDANCE$Abundance_Log)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #################################################################################### Damselfish and coral bites 
 
-
-TTCDI <- DAMSONLY %>% # average damselfish bites on each transect per site and year
-  group_by(location, surveyyear, transect) %>% 
+TCDI <- DAMSONLY  %>% # Mean damselfish bites at each site per year
+  group_by(location, surveyyear, code_meaning)  %>% 
   summarise(
-    Damselfish_Bites = (mean(extent)) ,
-    Damselfish_Species = code_meaning ,
-  .groups = "drop") %>% 
-  unique()
-
-TCDI <- TTCDI  %>% # Mean damselfish bites at each site per year
-  group_by(location, surveyyear)  %>% 
-  summarise(
-    Damselfish_Species = Damselfish_Species,
-    Damselfish_Bites = (sum(Damselfish_Bites)/6) , # There are 6 transects per site
+    Damselfish_Extent = (sum(extent)/6) , # There are 6 transects per site
     .groups = "drop") %>% 
     unique()
 
 TUSVI_BDAMS <- TCDI %>%  # Mean damselfish bites per site 
-  group_by(location,)  %>% 
+  group_by(location)  %>% 
   summarise(
-    Damselfish_Species = Damselfish_Species,
-    Damselfish_Bites = mean(Damselfish_Bites),
+    Damselfish_Species = code_meaning,
+    Damselfish_Extent = mean(Damselfish_Extent),
     .groups = "drop") %>% 
   unique()
 
@@ -89,7 +211,7 @@ TSTT_BDAMS <- dplyr::filter(CLEAN_TUSVI_BDAMS, #Only including St. Thomas sites
                           Island %in% c(
                             "STT"
                           ))
-TSTT_BDAMS_BPLOT <- ggplot(TSTT_BDAMS, aes(x = Location, y = Damselfish_Bites, fill = Damselfish_Species)) + # average damselfish bites per site
+TSTT_BDAMS_BPLOT <- ggplot(TSTT_BDAMS, aes(x = Location, y = Damselfish_Extent, fill = Damselfish_Species)) + # average damselfish bites per site
   geom_col(position = "dodge") +
   labs(title = "Average Damselfish Bites on Coral on St. Thomas") +
   labs(fill = "Damselfish species") +
