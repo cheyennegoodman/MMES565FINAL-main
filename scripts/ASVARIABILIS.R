@@ -1,8 +1,8 @@
 ####################################################################################################################################################
-# TCRMP FISH Damselfish Abundance From 2013-2026
+# TCRMP FISH Stegates Variabilis Density From 2013-2025
 # Owner: Lila Goodman
 # Created On: 10-11-2025
-# Last Edit: 18-06-2026
+# Last Edit: 21-07-2026
 ##########################################################################
 
 ####Libraries########
@@ -17,6 +17,10 @@ library(MASS)
 #GOAL: average Stegates variabilis abundance at every TCRMP site from 2013-2025
 TCRMP_SITE <- read.csv("TCRMP_datasets/TCRMP_Site_Metadata.xls - SiteMetadata.csv") # loading TCRMP SITE data
 
+TCRMP_SITE$Island[TCRMP_SITE$Island == "STT"] <- "St. Thomas"
+TCRMP_SITE$Island[TCRMP_SITE$Island == "STJ"] <- "St. John"
+TCRMP_SITE$Island[TCRMP_SITE$Island == "STX"] <- "St. Croix" # changed to proper names
+
 TCRMP_FISH_RAW <- read.csv("TCRMP_datasets/TCRMP_FISH/APR2026/TCRMP_Master_Fish_Census_Apr2026_Abundance.csv") # TCRMP FISH data
 
 TCRMP_FISH <- subset(TCRMP_FISH_RAW, select = -c(SampleDate, SampleMonth , Period, CommonName, Observer, TrophicGroup, X0.5, X6.10, X11.20, X21.30, X31.40, X41.50, X51.60, X61.70, X71.80, X81.90, X91.100, X101.110, X111.120, X121.130, X131.140, X141.150, X.150)) %>%  #removing excess columns
@@ -25,138 +29,184 @@ TCRMP_FISH <- subset(TCRMP_FISH_RAW, select = -c(SampleDate, SampleMonth , Perio
 CLEAN_TCRMP_FISH <- left_join(TCRMP_FISH, TCRMP_SITE[, c("Location", "Depth", "Island" )], by = "Location") #attaching island names and depth to dataset
 
 
-TABUND_SV <- dplyr::filter(CLEAN_TCRMP_FISH,
+TDENS_SV <- dplyr::filter(CLEAN_TCRMP_FISH,
                           ScientificName %in% c(
                             "Stegastes variabilis"
-                          ))
+                          )) %>% 
+  mutate(Damselfish_Density = ((SppTotal/100))) # DENSITY OF DAMSELFISH in 100M^2 area conversion 
 
 ####################################################################################################################################################################  STEGATES VARIABILIS ACROSS USVI ##############################
 
-TUSVI_TAMSV <- TABUND_SV %>% # mean of damselfish abundance along each transect by year and location
+TUSVI_TDMSV <- TDENS_SV %>% # mean of damselfish density along each transect by year and location
   group_by(Location, Transect, SampleYear) %>% 
   summarise(
     Island = Island ,
-    Mean_Abundance  = mean(SppTotal) ,
+    Mean_Density  = mean(Damselfish_Density) ,
     .groups = "drop") %>% 
   unique()
 
-TUSVI_ABUNDANCE_SV <- TUSVI_TAMSV  %>% # Mean of damselfish abundance along each site per year and Island
+TUSVI_DENSITY_SV <- TUSVI_TDMSV  %>% # Mean of damselfish density along each site per year and Island
   group_by(Island, SampleYear)  %>% 
   summarise(
-    Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+    Location = Location ,
+    Density_Mean = (sum(Mean_Density))/10 #10 is the transect per site
   )
 
-TUSVIABUNDANCE_SV_LPLOT <- ggplot(TUSVI_ABUNDANCE_SV, aes(x = SampleYear , y = Abundance_Mean, group= Island, color = Island)) +
+TUSVI_DENSITY_SV_LPLOT <- ggplot(TUSVI_DENSITY_SV, aes(x = SampleYear , y = Density_Mean, group= Island, color = Island)) +
   geom_line() +
-  scale_color_manual(values = c(
-    "STT" = "coral",
-    "STJ"   = "green2",
-    "STX"  = "cyan2")) +
-  scale_x_continuous(breaks = seq(min(TUSVI_ABUNDANCE_SV$SampleYear), max(TUSVI_ABUNDANCE_SV$SampleYear), by = 1)) +
-  labs(title = "Average Stegates variabilis Abundance at TCRMP Sites in the USVI from 2013-2025") +
-  labs(x= "Year", y= "Stegates variabilis Mean Abundance") +
-  labs(caption = "Figure No. ?. Average Stegates variabilis abundance at TCRMP sites from 2013-2025. These sites are located on St. Thomas (STT), St. Croix (STX), and St. John (STJ).") +
+  scale_fill_manual(values = c(
+    "St. Thomas" = "steelblue",
+    "St. John"   = "forestgreen",
+    "St. Croix"  = "orange")) +
+  scale_x_continuous(breaks = seq(min(TUSVI_DENSITY_SV$SampleYear), max(TUSVI_DENSITY_SV$SampleYear), by = 1)) +
+  labs(title = "Average Stegates variabilis Density at TCRMP Sites in the USVI from 2013-2025") +
+  labs(x= "Year", y= "Stegates variabilis Mean Density") +
+  labs(caption = "Figure No. ?. Average Stegates variabilis density at TCRMP sites from 2013-2025. These sites are located on St. Thomas, St. Croix, and St. John.") +
   theme_minimal() +
   theme(legend.position = "right") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
-print(TUSVIABUNDANCE_SV_LPLOT)
+print(TUSVI_DENSITY_SV_LPLOT)
+
+
+TUSVI_SITE_DSV <- TUSVI_DENSITY_SV %>% 
+  group_by(Location) %>% 
+  summarise(
+    Island = Island ,
+    MEAN_Density = mean(Density_Mean),
+    SD_Density = sd((Density_Mean)),
+    SEM_Density = sd((Density_Mean)) / sqrt(length((Density_Mean)))) %>%
+  unique()
+
+TUSVI_DSV <- TUSVI_SITE_DSV %>% 
+  mutate(
+    Island = factor(Island, levels = c("St. Thomas", "St. John", "St. Croix"))
+  ) %>%
+  arrange(Island, Location) %>%
+  mutate(Location = factor(Location, levels = unique(Location)))
+
+TUSVI_DSV$Location <- factor(
+  TUSVI_DSV$Location,
+  levels = TUSVI_DSV %>%
+    arrange(Island, Location) %>%
+    pull(Location) %>%
+    unique()
+) # organizing plot to be by island
+
+TUSVI_SITE_DSV_BPLOT <- ggplot(TUSVI_DSV, aes(x = Location , y = MEAN_Density , fill = Island)) + 
+  geom_col() + 
+  scale_fill_manual(values = c(
+    "St. Thomas" = "steelblue",
+    "St. John" = "forestgreen",
+    "St. Croix" = "orange"
+  )) +
+  geom_errorbar(aes(ymin = MEAN_Density-SEM_Density, ymax = MEAN_Density+SEM_Density), width = .9)  +
+  labs(title = "Mean Stegates Variabilis Density at Territorial Coral Reef Monitoring (TCRMP) Fish Sites in the US Virgin Islands") +
+  labs(y = "Stegates variabilis Mean Density(100m^2)")+
+  labs(x = "TCRMP Sites") +
+  labs(caption = "Figure No. . Mean Stegates variabilis density (100/m^2) and SEM of TCRMP sites preformed by fish surveys from 2013-2025. Sites are separated by island of St. Croix(orange) St. Thomas(blue), and St. John(green).") +
+  scale_y_continuous(
+    limits = c(0, NA),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1 , hjust = 1))
+
 
 ################### ST. THOMAS ###########################
 
 
-TSTT_ASV <- dplyr::filter(TABUND_SV, #Only including St. Thomas sites
+TSTT_DSV <- dplyr::filter(TDENS_SV, #Only including St. Thomas sites
                          Island %in% c(
-                           "STT"
+                           "St. Thomas"
                          ))
 
-TSTT_TAMSV <- TSTT_ASV %>% # mean of damselfish abundance along each transect by year and location
+TSTT_TDMSV <- TSTT_DSV %>% # mean of damselfish density along each transect by year and location
   group_by(Location, Transect, SampleYear) %>% 
   summarise(
-    Mean_Abundance  = mean(SppTotal) ,
+    Mean_Density  = mean(Damselfish_Density) ,
     .groups = "drop") %>% 
   unique()
 
-TSTT_ABUNDANCE_SV <- TSTT_TAMSV  %>% # Mean of damselfish abundance along each site per year and location
+TSTT_DENSITY_SV <- TSTT_TDMSV  %>% # Mean of damselfish density along each site per year and location
   group_by(Location, SampleYear)  %>% 
   summarise(
-    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+    Location_Density_Mean = (sum(Mean_Density))/10 #10 is the transect per site
   )
 
-TSTT_ABUNDANCE_SV_LPLOT <- ggplot(TSTT_ABUNDANCE_SV, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) +
+TSTT_DENSITY_SV_LPLOT <- ggplot(TSTT_DENSITY_SV, aes(x = SampleYear , y = Location_Density_Mean, group = Location, color = Location)) +
   geom_line() +
-  scale_x_continuous(breaks = seq(min(TSTT_ABUNDANCE_SV$SampleYear), max(TSTT_ABUNDANCE_SV$SampleYear), by = 1)) +
-  labs(title = "Stegates Variabilis Abundance at TCRMP Sites on St. Thomas") +
-  labs(x= "Year", y= "Stegates variabilis Mean Abundance") +
-  labs(caption = "Figure No. ?. Average Stegates variabilis Abundance at TCRMP Sites on St. Thomas") +
+  scale_x_continuous(breaks = seq(min(TSTT_DENSITY_SV$SampleYear), max(TSTT_DENSITY_SV$SampleYear), by = 1)) +
+  labs(title = "Mean Stegates Variabilis Density at TCRMP Sites on St. Thomas") +
+  labs(x= "Year", y= "Stegates variabilis Mean Density (100m^2)") +
+  labs(caption = "Figure No. ?. Mean Stegates variabilis density at TCRMP Sites on St. Thomas") +
   theme_minimal() +
   theme(legend.position = "right") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
-print(TSTT_ABUNDANCE_SV_LPLOT)
+print(TSTT_DENSITY_SV_LPLOT)
 
 ############################# ST. CROIX ##################################
 
-TSTX_ASV <- dplyr::filter(TABUND_SV, #Only including St. Thomas sites
+TSTX_DSV <- dplyr::filter(TDENS_SV, #Only including St. Croix sites
                         Island %in% c(
-                          "STX"
+                          "St. Croix"
                         ))
 
-TSTX_TAMSV <- TSTX_ASV %>% # mean of damselfish abundance along each transect by year and location
+TSTX_TDMSV <- TSTX_DSV %>% # mean of damselfish density along each transect by year and location
   group_by(Location, Transect, SampleYear) %>% 
   summarise(
-    Mean_Abundance  = mean(SppTotal) ,
+    Mean_Density = mean(Damselfish_Density) ,
     .groups = "drop") %>% 
   unique()
 
-TSTX_ABUNDANCE_SV <- TSTX_TAMSV  %>% # Mean of damselfish abundance along each site per year and location
+TSTX_DENSITY_SV <- TSTX_TDMSV  %>% # Mean of damselfish density along each site per year and location
   group_by(Location, SampleYear)  %>% 
   summarise(
-    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+    Location_Density_Mean = (sum(Mean_Density))/10 #10 is the transect per site
   )
 
-TSTX_ABUNDANCE_SV_LPLOT <- ggplot(TSTX_ABUNDANCE_SV, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) + 
+TSTX_DENSITY_SV_LPLOT <- ggplot(TSTX_DENSITY_SV, aes(x = SampleYear , y = Location_Density_Mean, group = Location, color = Location)) + 
   geom_line() +
-  scale_x_continuous(breaks = seq(min(TSTX_ABUNDANCE_SV$SampleYear), max(TSTX_ABUNDANCE_SV$SampleYear), by = 1)) +
-  labs(title = "Stegates Variabilis Abundance at TCRMP Sites on St. Croix") +
-  labs(x= "Year", y= "Stegates variabilis Mean Abundance") + 
-  labs(caption = "Figure No. ?. Average Stegates variabilis Abundance at TCRMP Sites on St. Croix") +
+  scale_x_continuous(breaks = seq(min(TSTX_DENSITY_SV$SampleYear), max(TSTX_DENSITY_SV$SampleYear), by = 1)) +
+  labs(title = "Mean Stegates Variabilis Density at TCRMP Sites on St. Croix") +
+  labs(x= "Year", y= "Stegates variabilis Mean Density (100m^2)") + 
+  labs(caption = "Figure No. ?. Mean Stegates variabilis Density at TCRMP Sites on St. Croix") +
   theme_minimal() +
   theme(legend.position = "right") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
-print(TSTX_ABUNDANCE_SV_LPLOT)
+print(TSTX_DENSITY_SV_LPLOT)
 
 ##################### ST. JOHN ##################################
 
-TSTJ_TAMSV <- dplyr::filter(TABUND_SV, #Only including St. Thomas sites
+TSTJ_TDMSV <- dplyr::filter(TDENS_SV, #Only including St. John sites
                            Island %in% c(
-                             "STJ"
+                             "St. John"
                            ))
 
-TSTJ_TAMSV <- TSTJ_TAMSV %>% # mean of damselfish abundance along each transect by year and location
+TSTJ_TDMSV <- TSTJ_TDMSV %>% # mean of damselfish denity along each transect by year and location
   group_by(Location, Transect, SampleYear) %>% 
   summarise(
-    Mean_Abundance  = mean(SppTotal) ,
+    Mean_Density  = mean(Damselfish_Density) ,
     .groups = "drop") %>% 
   unique()
 
-TSTJ_ABUNDANCE_SV <- TSTJ_TAMSV  %>% # Mean of damselfish abundance along each site per year and location
+TSTJ_DENSITY_SV <- TSTJ_TDMSV  %>% # Mean of damselfish density along each site per year and location
   group_by(Location, SampleYear)  %>% 
   summarise(
-    Location_Abundance_Mean = (sum(Mean_Abundance))/10 #10 is the transect per site
+    Location_Density_Mean = (sum(Mean_Density))/10 #10 is the transect per site
   )
 
-TSTJ_ABUNDANCE_SV_LPLOT <- ggplot(TSTJ_ABUNDANCE_SV, aes(x = SampleYear , y = Location_Abundance_Mean, group= Location, color = Location)) + 
+TSTJ_DENSITY_SV_LPLOT <- ggplot(TSTJ_DENSITY_SV, aes(x = SampleYear , y = Location_Density_Mean, group = Location, color = Location)) + 
   geom_line() +
-  scale_x_continuous(breaks = seq(min(TSTJ_ABUNDANCE_SV$SampleYear), max(TSTJ_ABUNDANCE_SV$SampleYear), by = 1)) +
-  labs(title = "Stegates Variabilis Abundance at TCRMP Sites on St. John") +
-  labs(x= "Year", y= "Stegates variabilis Mean Abundance") + 
-  labs(caption = "Figure No. ?. Average Stegates variabilis Abundance at TCRMP Sites on St. John") +
+  scale_x_continuous(breaks = seq(min(TSTJ_DENSITY_SV$SampleYear), max(TSTJ_DENSITY_SV$SampleYear), by = 1)) +
+  labs(title = "Mean Stegates Variabilis Density at TCRMP Sites on St. John") +
+  labs(x= "Year", y= "Stegates variabilis Mean Density (100m^2)") + 
+  labs(caption = "Figure No. ?. Mean Stegates variabilis sensity at TCRMP Sites on St. John") +
   theme(legend.position = "right") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
-print(TSTJ_ABUNDANCE_SV_LPLOT)
+print(TSTJ_DENSITY_SV_LPLOT)
 
 ############################################################################################################################################################################################################################################################# STATS TIME #######################################
 
@@ -209,12 +259,12 @@ TUSVI_ASV_BPLOT <- ggplot(TUSVI_ASV_ANOVA, aes(x = Island , y = Abundance_Log , 
             size = 6) +
   scale_y_continuous(limits = c(-2.5, 5)) +
   scale_fill_manual(values = c(
-    "STT" = "coral",
-    "STJ"   = "green2",
-    "STX"  = "cyan2")) +
-  labs(title = "Stegates variabilis Mean Abundance Across TCRMP Sites From 2013-2025") +
-  labs(caption = "Stegates variabilis Mean Abundance on St. Thomas(STT) , St. Croix(STX), and St. John(STJ).") +
-  labs(x = "Island" , y = "Stegates variabilis Mean Abundance log(Abundance)") +
+    "St. Thomas" = "steelblue",
+    "St. John"   = "forestgreen",
+    "St. Croix"  = "orange")) +
+  labs(title = "Stegates variabilis Mean Density Across TCRMP Sites From 2013-2025") +
+  labs(caption = "Stegates variabilis Mean Density on St. Thomas(STT) , St. Croix(STX), and St. John(STJ).") +
+  labs(x = "Island" , y = "Stegates variabilis Mean Density (100m^2)") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
