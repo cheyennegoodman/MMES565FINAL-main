@@ -7,11 +7,12 @@ website:
   title: "MMES565FINAL"
   navbar:
     left:
-      - href: index.qmd
+      - href: Introduction.qmd
         text: Home
       - Methods.qmd
       - Statistics.qmd
       - Other Projects.qmd
+      - index.qmd
       - about.qmd
       
 
